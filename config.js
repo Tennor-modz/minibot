@@ -1,0 +1,21 @@
+module.exports = {
+    AUTO_VIEW_STATUS: 'true',
+    AUTO_LIKE_STATUS: 'true',
+    AUTO_RECORDING: 'true',
+    AUTO_LIKE_EMOJI: ['🧩', '🍉', '💜', '🌸', '🪴', '💊', '💫', '🍂', '🌟', '🎋', '😶‍🌫️', '🫀', '🧿', '👀', '🤖', '🚩', '🥰', '🗿', '💜', '💙', '🌝', '🖤', '💚'],
+    PREFIX: '.',
+    MAX_RETRIES: 3,
+    GROUP_INVITE_LINK: 'https://chat.whatsapp.com/CzFlFQrkdzxFw0pxCBYM7H?mode=ems_copy_t',
+    ADMIN_LIST_PATH: './admin.json',
+    IMAGE_PATH: 'https://files.catbox.moe/dc5opm.jpg',
+    NEWSLETTER_JID: '120363322464215140@newsletter',
+    NEWSLETTER_MESSAGE_ID: '428',
+    OTP_EXPIRY: 300000,
+    NEWS_JSON_URL: '',
+    BOT_NAME: '𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲 𝗠𝗱',
+    OWNER_NAME: '𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲',
+    OWNER_NUMBER: '254703726139',
+    BOT_VERSION: '9.0.0',
+    BOT_FOOTER: '> © Made by Trashcore devs',
+    CHANNEL_LINK: 'https://whatsapp.com/channel/0029VafrbsKG8l5EFBDDCy41'
+};
