@@ -516,7 +516,7 @@ async function fetchNews() {
 }
 
 // Setup command handlers with buttons and images
-/*function setupCommandsHandlers(socket, number) {
+function setupCommandsHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
         if (!msg.message || msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid === config.NEWSLETTER_JID) return;
@@ -785,7 +785,7 @@ case 'owner': {
             });
         }
     });
-}*/
+}
 
 // Setup message handlers
 function setupMessageHandlers(socket) {
