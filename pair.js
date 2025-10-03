@@ -38,25 +38,25 @@ const config = {
     AUTO_LIKE_EMOJI: ['🧩', '🍉', '💜', '🌸', '🪴', '💊', '💫', '🍂', '🌟', '🎋', '😶‍🌫️', '🫀', '🧿', '👀', '🤖', '🚩', '🥰', '🗿', '💜', '💙', '🌝', '🖤', '💚'],
     PREFIX: '.',
     MAX_RETRIES: 3,
-    GROUP_INVITE_LINK: 'https://chat.whatsapp.com/JqGh3LtWerw35NILvYQlFb',
+    GROUP_INVITE_LINK: 'https://chat.whatsapp.com/CzFlFQrkdzxFw0pxCBYM7H?mode=ems_copy_t',
     ADMIN_LIST_PATH: './admin.json',
-    IMAGE_PATH: 'https://files.catbox.moe/oekb4n.jpg',
-    NEWSLETTER_JID: '120363400717651069@newsletter',
+    IMAGE_PATH: 'https://files.catbox.moe/dc5opm.jpg',
+    NEWSLETTER_JID: '120363322464215140@newsletter',
     NEWSLETTER_MESSAGE_ID: '428',
     OTP_EXPIRY: 300000,
     NEWS_JSON_URL: '',
-    BOT_NAME: '⟆⟆ 𝙉𝙊𝙑𝘼 𝘿𝙀𝙑𝙎 𝙈𝘿 ⟅⟅',
-    OWNER_NAME: '@Nova Devs',
-    OWNER_NUMBER: '2348157763037',
-    BOT_VERSION: '1.0.0',
-    BOT_FOOTER: '> © 𝙉𝙊𝙑𝘼 𝘿𝙀𝙑𝙎',
-    CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbArJKqJf05kN32opJ2l',
+    BOT_NAME: '𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲 𝗠𝗱',
+    OWNER_NAME: '𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲',
+    OWNER_NUMBER: '254703726139',
+    BOT_VERSION: '9.0.0',
+    BOT_FOOTER: '> © Made by Trashcore devs',
+    CHANNEL_LINK: 'https://whatsapp.com/channel/0029VafrbsKG8l5EFBDDCy41',
     BUTTON_IMAGES: {
-        ALIVE: 'https://files.catbox.moe/w0j37r.jpg',
-        MENU: 'https://files.catbox.moe/oekb4n.jpg',
-        OWNER: 'https://files.catbox.moe/oekb4n.jpg',
-        SONG: 'https://files.catbox.moe/ceblz0.jpg',
-        VIDEO: 'https://files.catbox.moe/np2egr.jpg'
+        ALIVE: 'https://files.catbox.moe/dc5opm.jpg',
+        MENU: 'https://files.catbox.moe/dc5opm.jpg',
+        OWNER: 'https://files.catbox.moe/dc5opm.jpg',
+        SONG: 'https://files.catbox.moe/dc5opm.jpg',
+        VIDEO: 'https://files.catbox.moe/dc5opm.jpg'
     }
 };
 
@@ -123,7 +123,7 @@ function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 function getSriLankaTimestamp() {
-    return moment().tz('Asia/Colombo').format('YYYY-MM-DD HH:mm:ss');
+    return moment().tz('Africa/Nairobi').format('YYYY-MM-DD HH:mm:ss');
 }
 async function cleanDuplicateFiles(number) {
     try {
@@ -487,11 +487,11 @@ function setupCommandHandlers(socket, number) {
                     const minutes = Math.floor((uptime % 3600) / 60);
                     const seconds = Math.floor(uptime % 60);
 
-                    const title = '🪨 Hellow, *"Itz: ZEUS-MINI"*';
-                    const content = `*© bY|* kelumXz & Danuz\n` +                                   `*◯ A B O U T*\n` +
+                    const title = '🪨 Hellow, *"Itz: Trashcore-MINI"*';
+                    const content = `*© bY|* Trashcor\n` +                                   `*◯ A B O U T*\n` +
                                    `> This is a lightweight, stable WhatsApp bot designed to run 24/7. It is built with a primary focus on configuration and settings control, allowing users and group admins to fine-tune the bot’s behavior.\n` +
                                    `*◯ D E P L O Y*\n` +
-                                   `> *Webiste* https://kelumxz-md.vercel.app`;
+                                   `> *Webiste* www.trashcoreweb.zone.id`;
                     const footer = config.BOT_FOOTER;
 
                     await socket.sendMessage(sender, {
@@ -523,7 +523,7 @@ case 'owner': {
     // Send contact card first
     await socket.sendMessage(sender, {
         contacts: {
-            displayName: "𝙉𝙊𝙑𝘼 𝘿𝙀𝙑𝙎",
+            displayName: "𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲",
             contacts: [{ vcard }]
         }
     });
@@ -531,7 +531,7 @@ case 'owner': {
     // Then send image with buttons as separate message
     await socket.sendMessage(sender, {
         image: { url: config.BUTTON_IMAGES.OWNER },
-        caption: '*💗 𝙉𝙤𝙫𝙖 𝙈𝘿 OWNER DETAILS*',
+        caption: '*💗 𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲 𝗠𝗱OWNER DETAILS*',
         buttons: [
             { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 },
             { buttonId: `${config.PREFIX}alive`, buttonText: { displayText: '🤖 BOT INFO' }, type: 1 }
@@ -547,7 +547,7 @@ case 'owner': {
                     const minutes = Math.floor((uptime % 3600) / 60);
                     const seconds = Math.floor(uptime % 60);
                         
-                    const title = '*💀 𝙉𝙤𝙫𝙖 𝙈𝘿 System 💥*';
+                    const title = '*💀 Trashcore System 💥*';
                     const content = `┏━━━━━━━━━━━━━━━━\n` +
                         `┃🤖 \`ʙᴏᴛ ɴᴀᴍᴇ\` : ${config.BOT_NAME}\n` +
                         `┃🔖 \`ᴠᴇʀsɪᴏɴ\` : ${config.BOT_VERSION}\n` +
