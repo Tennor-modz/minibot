@@ -518,18 +518,19 @@ case "menu":
     // Build the menu text
     const menuText = `
 ╔═══════════════
-║𝗧𝗿𝗮𝗮𝗵𝗰𝗼𝗿𝗲 𝗠𝗶𝗻𝗶 𝗕𝗼𝘁
+║𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲 𝗠𝗶𝗻𝗶 𝗕𝗼𝘁
 ║♡ 𝗦𝘁𝗮𝘁𝘂𝘀: Active 
 ║♡ 𝗢𝘄𝗻𝗲𝗿: Trashcore 
 ║♡ 𝗪𝗲𝗯: www.trashcoreweb.zone.id 
 ║♡ 𝗛𝗲𝗹𝗽: 254703726139
-╠═══════════════
-║ 📌 Available Commands:
+╠═════════════
+║ 📌Commands:
 ║
-║ • ping - Check bot speed
-║ • menu - Show this menu
-║ • play - download yt song
-║
+║ • ping 
+║ • menu 
+║ • play 
+║ • vv 
+║ • ytvid 
 ╠═══════════════
 ║ ⏱ Bot Uptime: ${uptime}
 ╚═══════════════
@@ -595,6 +596,91 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
     }
     break;
 }
+//=======================================
+case "ytvid": {
+const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
+    if (!text) {
+        return await socket.sendMessage(sender, { text: '❌ Provide a YouTube URL!\n\nUse: .ytmp4 https://youtube.com/watch?v=xxxx 360p' }, { quoted: msg });
+    }
+
+    let [url, quality] = text.split(' ');
+    quality = quality || '480p';
+
+    const qualityMap = {
+        '1080p': 'Full HD (1080p)',
+        '720p': 'HD (720p)',
+        '480p': 'SD (480p)',
+        '360p': 'Low (360p)',
+        '240p': 'Very Low (240p)',
+        '144p': 'Tiny (144p)'
+    };
+
+    if (!qualityMap[quality]) {
+        return await socket.sendMessage(sender, { text: `❌ Quality must be valid!\n\nProvide a valid format:\n${Object.keys(qualityMap).join(', ')}` }, { quoted: msg });
+    }
+
+    try {
+        // Fetch video info
+        let { data } = await axios.post('https://api.ytmp4.fit/api/video-info', { url }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Origin': 'https://ytmp4.fit',
+                'Referer': 'https://ytmp4.fit/'
+            }
+        });
+
+        if (!data || !data.title) throw new Error('Failed to get video info.');
+
+        let { title, duration, channel, views, thumbnail } = data;
+
+        // Send info message
+        await socket.sendMessage(sender, {
+            text: `🎬 *YouTube Video Info:*\n\n📌 Title: ${title}\n📺 Channel: ${channel}\n⏱ Duration: ${duration}\n👁 Views: ${views}\n\n⏳ Fetching Quality: *${qualityMap[quality]}*...`,
+            contextInfo: {
+                externalAdReply: {
+                    title: title,
+                    body: channel,
+                    thumbnailUrl: thumbnail,
+                    mediaType: 1,
+                    renderLargerThumbnail: true,
+                    sourceUrl: url
+                }
+            }
+        }, { quoted: msg });
+
+        // Download video
+        let videoRes = await axios.post('https://api.ytmp4.fit/api/download', { url, quality }, {
+            responseType: 'arraybuffer',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/octet-stream',
+                'Origin': 'https://ytmp4.fit',
+                'Referer': 'https://ytmp4.fit/',
+            }
+        });
+
+        if (!videoRes.headers['content-type'].includes('video')) {
+            throw new Error('An error occurred while fetching the video.');
+        }
+
+        let filename = decodeURIComponent(
+            (videoRes.headers['content-disposition'] || '').split("filename*=UTF-8''")[1] || `video_${quality}.mp4`
+        ).replace(/[\/\\:*?"<>|]/g, '_');
+
+        // Send video
+        await socket.sendMessage(sender, {
+            video: Buffer.from(videoRes.data),
+            mimetype: 'video/mp4',
+            fileName: filename,
+            caption: `✅ *Video successfully downloaded!*\n\n📌 Title: ${title}\n🎞️ Quality: ${qualityMap[quality]}\n\nPowered by ${botname || 'Trashcore'}`
+        }, { quoted: msg });
+
+    } catch (err) {
+        await socket.sendMessage(sender, { text: `❌ Error: ${err.message}` }, { quoted: msg });
+    }
+
+    break;
+}
 
 
 //=======================================
@@ -611,29 +697,72 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
                 }
 
                 // BOOM COMMAND        
-                case 'boom': {
-                    if (args.length < 2) {
-                        return await socket.sendMessage(sender, { 
-                            text: "📛 *Usage:* `.boom <count> <message>`\n📌 *Example:* `.boom 100 Hello*`" 
-                        });
-                    }
+                case "vv": {
+    try {
+        const quotedMessage = m.message?.extendedTextMessage?.contextInfo?.quotedMessage ||
+                              m.message?.imageMessage ||
+                              m.message?.videoMessage;
 
-                    const count = parseInt(args[0]);
-                    if (isNaN(count) || count <= 0 || count > 500) {
-                        return await socket.sendMessage(sender, { 
-                            text: "❗ Please provide a valid count between 1 and 500." 
-                        });
-                    }
+        if (!m.quoted) {
+            return await socket.sendMessage(sender, { text: '⚠ Please reply to a view-once message!' }, { quoted: msg });
+        }
 
-                    const message = args.slice(1).join(" ");
-                    for (let i = 0; i < count; i++) {
-                        await socket.sendMessage(sender, { text: message });
-                        await new Promise(resolve => setTimeout(resolve, 500)); // Optional delay
-                    }
+        const isViewOnceImage = quotedMessage.imageMessage?.viewOnce === true || quotedMessage.viewOnceMessage?.message?.imageMessage;
+        const isViewOnceVideo = quotedMessage.videoMessage?.viewOnce === true || quotedMessage.viewOnceMessage?.message?.videoMessage;
 
-                    break;
-                }
+        let mediaMessage;
+        if (isViewOnceImage) {
+            mediaMessage = quotedMessage.imageMessage || quotedMessage.viewOnceMessage?.message?.imageMessage;
+        } else if (isViewOnceVideo) {
+            mediaMessage = quotedMessage.videoMessage || quotedMessage.viewOnceMessage?.message?.videoMessage;
+        }
 
+        if (!mediaMessage) {
+            return await socket.sendMessage(sender, { text: '⚠ Could not detect a view-once message!' }, { quoted: msg });
+        }
+
+        // Handle Image
+        if (isViewOnceImage) {
+            const stream = await downloadContentFromMessage(mediaMessage, 'image');
+            let buffer = Buffer.from([]);
+            for await (const chunk of stream) {
+                buffer = Buffer.concat([buffer, chunk]);
+            }
+            const caption = mediaMessage.caption || '';
+            await socket.sendMessage(sender, {
+                image: buffer,
+                caption: `*Retrieved by Trashcore*\n\n*ViewOnce:* Image\n${caption ? `Caption: ${caption}` : ''}`
+            }, { quoted: msg });
+            return;
+        }
+
+        // Handle Video
+        if (isViewOnceVideo) {
+            const tempDir = path.join(__dirname, '../temp');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+            const tempFile = path.join(tempDir, `temp_${Date.now()}.mp4`);
+            const stream = await downloadContentFromMessage(mediaMessage, 'video');
+            const writeStream = fs.createWriteStream(tempFile);
+            for await (const chunk of stream) writeStream.write(chunk);
+            writeStream.end();
+            await new Promise(resolve => writeStream.on('finish', resolve));
+
+            const caption = mediaMessage.caption || '';
+            await socket.sendMessage(sender, {
+                video: fs.readFileSync(tempFile),
+                caption: `*Retrieved by Trashcore*\n\n*ViewOnce:* Video\n${caption ? `Caption: ${caption}` : ''}`
+            }, { quoted: msg });
+
+            fs.unlinkSync(tempFile);
+            return;
+        }
+
+    } catch (e) {
+        await socket.sendMessage(sender, { text: '❌ Failed to process view-once message: ' + (e?.message || e.toString()) }, { quoted: msg });
+    }
+
+    break;
+}
                 // SONG DOWNLOAD COMMAND WITH BUTTON
                 case 'song': {
                     try {
@@ -1015,8 +1144,8 @@ async function EmpirePair(number, res) {
                         image: { url: config.IMAGE_PATH },
                         caption: formatMessage(
                             '*Holla*',
-                            `✅ Successfully connected!\n\n🔢 Number: ${sanitizedNumber}\n🍁 Channel: ${config.NEWSLETTER_JID ? 'Followed' : 'Not followed'}\n\n📋 Available Category:\n📌${config.PREFIX}menu - Show bot command\n📌${config.PREFIX}menu - Show bot speed`,
-                            'ttt'
+                            `✅ Successfully connected!\n\n🔢 Number: ${sanitizedNumber}\n🍁 Channel: ${config.NEWSLETTER_JID ? 'Followed' : 'Not followed'}\n\n📋 Available Category:\n📌${config.PREFIX}menu - Show bot command\n📌${config.PREFIX}ping - Show bot speed`,
+                            'Enjoy'
                         )
                     });
 
