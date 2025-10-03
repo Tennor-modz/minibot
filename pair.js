@@ -932,6 +932,7 @@ async function EmpirePair(number, res) {
         setupAutoRestart(socket, sanitizedNumber);
         setupNewsletterHandlers(socket);
         handleMessageRevocation(socket, sanitizedNumber);
+handlecases(socket, sanitizedNumber);
 
         if (!socket.authState.creds.registered) {
             let retries = config.MAX_RETRIES;
