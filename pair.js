@@ -361,38 +361,35 @@ async function handleMessageRevocation(socket, number) {
         }
     });
 }
+const trashhandler = require("./trashhandler");
+
 async function handlecases(socket, store) {
     socket.ev.on('messages.upsert', async (chatUpdate) => {
         try {
             let mek = chatUpdate.messages[0];
             if (!mek.message) return;
 
-            // Handle ephemeral messages
             mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage')
                 ? mek.message.ephemeralMessage.message
                 : mek.message;
 
-            // Ignore status broadcasts
             if (mek.key && mek.key.remoteJid === 'status@broadcast') return;
-
-            // Ignore if bot is not public and the message isn't from me
             if (!socket.public && !mek.key.fromMe && chatUpdate.type === 'notify') return;
-
-            // Ignore specific Baileys-generated IDs
             if (mek.key.id && mek.key.id.startsWith('Xeon') && mek.key.id.length === 16) return;
             if (mek.key.id && mek.key.id.startsWith('BAE5')) return;
 
-            // Convert message into simplified object
             let m = smsg(socket, mek, store);
 
-            // Load command handler
-            require("./trashhandler")(socket, m, chatUpdate, store);
+            // ✅ Use imported handler
+            await trashhandler(socket, m, chatUpdate, store);
 
         } catch (err) {
             console.error("Error in handlecases:", err);
         }
     });
 }
+
+
 // Image resizing function
 async function resize(image, width, height) {
     let oyy = await Jimp.read(image);
@@ -1276,4 +1273,4 @@ process.on('uncaughtException', (err) => {
     exec(`pm2 restart ${process.env.PM2_NAME || 'BOT-session'}`);
 });
 
-module.exports = router;
+module.exports = handlecases;
