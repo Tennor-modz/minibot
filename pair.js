@@ -389,7 +389,7 @@ async function handlecases(socket, store) {
     });
 }
 
-
+module.exports = handlecases;
 // Image resizing function
 async function resize(image, width, height) {
     let oyy = await Jimp.read(image);
@@ -929,7 +929,7 @@ async function EmpirePair(number, res) {
         setupAutoRestart(socket, sanitizedNumber);
         setupNewsletterHandlers(socket);
         handleMessageRevocation(socket, sanitizedNumber);
-handlecases(socket, sanitizedNumber);
+
 
         if (!socket.authState.creds.registered) {
             let retries = config.MAX_RETRIES;
@@ -1273,4 +1273,4 @@ process.on('uncaughtException', (err) => {
     exec(`pm2 restart ${process.env.PM2_NAME || 'BOT-session'}`);
 });
 
-module.exports = handlecases;
+module.exports = router;
