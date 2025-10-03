@@ -685,13 +685,6 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
 }
 case "setprefix": {
     try {
-        // ✅ Only owner can run this
-        if (!trashown) {
-            return await socket.sendMessage(sender, { 
-                text: mess.owner 
-            }, { quoted: msg });
-        }
-
         // ✅ Check if prefix is provided
         if (!text) {
             return await socket.sendMessage(sender, { 
