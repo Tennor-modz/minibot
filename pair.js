@@ -42,7 +42,7 @@ const {
     makeCacheableSignalKeyStore,
     Browsers,
     jidNormalizedUser,
-    proto,
+    proto,downloadContentFromMessage,
     prepareWAMessageMedia,
     generateWAMessageFromContent
 } = require('@whiskeysockets/baileys');
