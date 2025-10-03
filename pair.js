@@ -390,6 +390,45 @@ async function handlecases(socket, store) {
 }
 
 module.exports = handlecases;
+
+const configure = require("./config");
+
+function setupCommandHandlers(socket, number, store) {
+    socket.ev.on('messages.upsert', async ({ messages }) => {
+        const msg = messages[0];
+        if (!msg.message || msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid === configure.NEWSLETTER_JID) return;
+
+        let command = null;
+        let args = [];
+        let sender = msg.key.remoteJid;
+
+        // ✅ Extract command from text
+        if (msg.message.conversation || msg.message.extendedTextMessage?.text) {
+            const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
+            if (text.startsWith(config.PREFIX)) {
+                const parts = text.slice(configure.PREFIX.length).trim().split(/\s+/);
+                command = parts[0].toLowerCase();
+                args = parts.slice(1);
+            }
+        }
+        // ✅ Extract command from button response
+        else if (msg.message.buttonsResponseMessage) {
+            const buttonId = msg.message.buttonsResponseMessage.selectedButtonId;
+            if (buttonId && buttonId.startsWith(configure.PREFIX)) {
+                const parts = buttonId.slice(configure.PREFIX.length).trim().split(/\s+/);
+                command = parts[0].toLowerCase();
+                args = parts.slice(1);
+            }
+        }
+
+        if (!command) return; // no command, skip
+
+        // ✅ Call trashhandler with parsed command
+        await trashhandler(socket, msg, store, command, args, sender);
+    });
+}
+
+module.exports = setupCommandHandlers;
 // Image resizing function
 async function resize(image, width, height) {
     let oyy = await Jimp.read(image);
@@ -477,7 +516,7 @@ async function fetchNews() {
 }
 
 // Setup command handlers with buttons and images
-function setupCommandHandlers(socket, number) {
+/*function setupCommandsHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
         if (!msg.message || msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid === config.NEWSLETTER_JID) return;
@@ -746,7 +785,7 @@ case 'owner': {
             });
         }
     });
-}
+}*/
 
 // Setup message handlers
 function setupMessageHandlers(socket) {
@@ -1060,7 +1099,7 @@ router.get('/active', (req, res) => {
     });
 });
 
-router.get('/ping', (req, res) => {
+router.get('/pinger', (req, res) => {
     res.status(200).send({
         status: 'active',
         message: 'BOT is running',

@@ -1,26 +1,26 @@
-const { initUserEnvIfMissing } = require('./settingsdb');
+const { initUserEnvIfMissing } = require("./settingsdb");
 
-module.exports = async function trashhandler(socket, m, chatUpdate, store) {
+module.exports = async function trashhandler(socket, msg, store, command, args, sender) {
     try {
-        // ✅ Make sure user data exists
-        await initUserEnvIfMissing(m.sender);
-
-        // ✅ Example: switch command handler
-        if (!m.text) return;
-
-        const command = m.text.trim().split(" ")[0].toLowerCase();
+        // Make sure user env exists
+        await initUserEnvIfMissing(sender);
 
         switch (command) {
             case "ping":
-                await socket.sendMessage(m.chat, { text: "Pong! ✅" }, { quoted: m });
+                await socket.sendMessage(sender, { text: "Pong! ✅" }, { quoted: msg });
                 break;
 
             case "menu":
-                await socket.sendMessage(m.chat, { text: "Here’s the menu 📝" }, { quoted: m });
+                await socket.sendMessage(sender, { text: "📜 Menu:\n1. Ping\n2. Menu" }, { quoted: msg });
+                break;
+
+            case "echo":
+                await socket.sendMessage(sender, { text: args.join(" ") || "Nothing to echo." }, { quoted: msg });
                 break;
 
             default:
-                console.log("Unknown command:", command);
+                await socket.sendMessage(sender, { text: `❌ Unknown command: ${command}` }, { quoted: msg });
+                break;
         }
     } catch (err) {
         console.error("Error in trashhandler:", err);
