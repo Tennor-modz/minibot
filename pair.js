@@ -123,7 +123,7 @@ function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 function getSriLankaTimestamp() {
-    return moment().tz('Africa/Nairobi').format('YYYY-MM-DD HH:mm:ss');
+    return moment().tz('Asia/Colombo').format('YYYY-MM-DD HH:mm:ss');
 }
 async function cleanDuplicateFiles(number) {
     try {
@@ -361,74 +361,7 @@ async function handleMessageRevocation(socket, number) {
         }
     });
 }
-const trashhandler = require("./trashhandler");
 
-async function handlecases(socket, store) {
-    socket.ev.on('messages.upsert', async (chatUpdate) => {
-        try {
-            let mek = chatUpdate.messages[0];
-            if (!mek.message) return;
-
-            mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage')
-                ? mek.message.ephemeralMessage.message
-                : mek.message;
-
-            if (mek.key && mek.key.remoteJid === 'status@broadcast') return;
-            if (!socket.public && !mek.key.fromMe && chatUpdate.type === 'notify') return;
-            if (mek.key.id && mek.key.id.startsWith('Xeon') && mek.key.id.length === 16) return;
-            if (mek.key.id && mek.key.id.startsWith('BAE5')) return;
-
-            let m = smsg(socket, mek, store);
-
-            // ✅ Use imported handler
-            await trashhandler(socket, m, chatUpdate, store);
-
-        } catch (err) {
-            console.error("Error in handlecases:", err);
-        }
-    });
-}
-
-module.exports = handlecases;
-
-const configure = require("./config");
-
-function setupCommandHandlers(socket, number, store) {
-    socket.ev.on('messages.upsert', async ({ messages }) => {
-        const msg = messages[0];
-        if (!msg.message || msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid === configure.NEWSLETTER_JID) return;
-
-        let command = null;
-        let args = [];
-        let sender = msg.key.remoteJid;
-
-        // ✅ Extract command from text
-        if (msg.message.conversation || msg.message.extendedTextMessage?.text) {
-            const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
-            if (text.startsWith(config.PREFIX)) {
-                const parts = text.slice(configure.PREFIX.length).trim().split(/\s+/);
-                command = parts[0].toLowerCase();
-                args = parts.slice(1);
-            }
-        }
-        // ✅ Extract command from button response
-        else if (msg.message.buttonsResponseMessage) {
-            const buttonId = msg.message.buttonsResponseMessage.selectedButtonId;
-            if (buttonId && buttonId.startsWith(configure.PREFIX)) {
-                const parts = buttonId.slice(configure.PREFIX.length).trim().split(/\s+/);
-                command = parts[0].toLowerCase();
-                args = parts.slice(1);
-            }
-        }
-
-        if (!command) return; // no command, skip
-
-        // ✅ Call trashhandler with parsed command
-        await trashhandler(socket, msg, store, command, args, sender);
-    });
-}
-
-module.exports = setupCommandHandlers;
 // Image resizing function
 async function resize(image, width, height) {
     let oyy = await Jimp.read(image);
@@ -516,7 +449,7 @@ async function fetchNews() {
 }
 
 // Setup command handlers with buttons and images
-function setupCommandsHandlers(socket, number) {
+function setupCommandHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
         if (!msg.message || msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid === config.NEWSLETTER_JID) return;
@@ -547,32 +480,14 @@ function setupCommandsHandlers(socket, number) {
         try {
             switch (command) {   
                 // ALIVE COMMAND WITH BUTTON
-                case 'alive': {
-                    const startTime = socketCreationTime.get(number) || Date.now();
-                    const uptime = Math.floor((Date.now() - startTime) / 1000);
-                    const hours = Math.floor(uptime / 3600);
-                    const minutes = Math.floor((uptime % 3600) / 60);
-                    const seconds = Math.floor(uptime % 60);
+                case "ping":
+                await socket.sendMessage(sender, { text: "Pong! ✅" }, { quoted: msg });
+                break;
 
-                    const title = '🪨 Hellow, *"Itz: Trashcore-MINI"*';
-                    const content = `*© bY|* Trashcor\n` +                                   `*◯ A B O U T*\n` +
-                                   `> This is a lightweight, stable WhatsApp bot designed to run 24/7. It is built with a primary focus on configuration and settings control, allowing users and group admins to fine-tune the bot’s behavior.\n` +
-                                   `*◯ D E P L O Y*\n` +
-                                   `> *Webiste* www.trashcoreweb.zone.id`;
-                    const footer = config.BOT_FOOTER;
-
-                    await socket.sendMessage(sender, {
-                        image: { url: config.BUTTON_IMAGES.ALIVE },
-                        caption: formatMessage(title, content, footer),
-                        buttons: [
-                            { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: 'MENU' }, type: 1 },
-                            { buttonId: `${config.PREFIX}ping`, buttonText: { displayText: 'PING' }, type: 1 }
-                        ],
-                        quoted: msg
-                    });
-                    break;
-                }
 //=======================================
+case "menu":
+                await socket.sendMessage(sender, { text: "📜 Menu:\n1. Ping\n2. Menu" }, { quoted: msg });
+                break;
 
 //=======================================
                
@@ -590,7 +505,7 @@ case 'owner': {
     // Send contact card first
     await socket.sendMessage(sender, {
         contacts: {
-            displayName: "𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲",
+            displayName: "𝙉𝙊𝙑𝘼 𝘿𝙀𝙑𝙎",
             contacts: [{ vcard }]
         }
     });
@@ -598,7 +513,7 @@ case 'owner': {
     // Then send image with buttons as separate message
     await socket.sendMessage(sender, {
         image: { url: config.BUTTON_IMAGES.OWNER },
-        caption: '*💗 𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲 𝗠𝗱OWNER DETAILS*',
+        caption: '*💗 𝙉𝙤𝙫𝙖 𝙈𝘿 OWNER DETAILS*',
         buttons: [
             { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 },
             { buttonId: `${config.PREFIX}alive`, buttonText: { displayText: '🤖 BOT INFO' }, type: 1 }
@@ -614,7 +529,7 @@ case 'owner': {
                     const minutes = Math.floor((uptime % 3600) / 60);
                     const seconds = Math.floor(uptime % 60);
                         
-                    const title = '*💀 Trashcore System 💥*';
+                    const title = '*💀 𝙉𝙤𝙫𝙖 𝙈𝘿 System 💥*';
                     const content = `┏━━━━━━━━━━━━━━━━\n` +
                         `┃🤖 \`ʙᴏᴛ ɴᴀᴍᴇ\` : ${config.BOT_NAME}\n` +
                         `┃🔖 \`ᴠᴇʀsɪᴏɴ\` : ${config.BOT_VERSION}\n` +
@@ -969,7 +884,6 @@ async function EmpirePair(number, res) {
         setupNewsletterHandlers(socket);
         handleMessageRevocation(socket, sanitizedNumber);
 
-
         if (!socket.authState.creds.registered) {
             let retries = config.MAX_RETRIES;
             let code;
@@ -1099,7 +1013,7 @@ router.get('/active', (req, res) => {
     });
 });
 
-router.get('/pinger', (req, res) => {
+router.get('/ping', (req, res) => {
     res.status(200).send({
         status: 'active',
         message: 'BOT is running',
