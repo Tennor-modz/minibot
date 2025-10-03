@@ -361,22 +361,38 @@ async function handleMessageRevocation(socket, number) {
         }
     });
 }
-socket.ev.on('messages.upsert', async chatUpdate => {
-        //console.log(JSON.stringify(chatUpdate, undefined, 2))
+async function handlecases(socket, store) {
+    socket.ev.on('messages.upsert', async (chatUpdate) => {
         try {
-            mek = chatUpdate.messages[0]
-            if (!mek.message) return
-            mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
-            if (mek.key && mek.key.remoteJid === 'status@broadcast') return
-            if (!socket.public && !mek.key.fromMe && chatUpdate.type === 'notify') return
-            if (mek.key.id.startsWith('Xeon') && mek.key.id.length === 16) return
-            if (mek.key.id.startsWith('BAE5')) return
-            m = smsg(socket, mek, store)
-            require("./trashhandler")(socket, m, chatUpdate, store)
+            let mek = chatUpdate.messages[0];
+            if (!mek.message) return;
+
+            // Handle ephemeral messages
+            mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage')
+                ? mek.message.ephemeralMessage.message
+                : mek.message;
+
+            // Ignore status broadcasts
+            if (mek.key && mek.key.remoteJid === 'status@broadcast') return;
+
+            // Ignore if bot is not public and the message isn't from me
+            if (!socket.public && !mek.key.fromMe && chatUpdate.type === 'notify') return;
+
+            // Ignore specific Baileys-generated IDs
+            if (mek.key.id && mek.key.id.startsWith('Xeon') && mek.key.id.length === 16) return;
+            if (mek.key.id && mek.key.id.startsWith('BAE5')) return;
+
+            // Convert message into simplified object
+            let m = smsg(socket, mek, store);
+
+            // Load command handler
+            require("./trashhandler")(socket, m, chatUpdate, store);
+
         } catch (err) {
-            console.log(err)
+            console.error("Error in handlecases:", err);
         }
-    })
+    });
+}
 // Image resizing function
 async function resize(image, width, height) {
     let oyy = await Jimp.read(image);
