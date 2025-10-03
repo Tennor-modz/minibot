@@ -566,67 +566,11 @@ case "menu": {
 }
 //=======================================
 //=======================================
-case "play": {
-    try {
-        // Extract message text
-        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
-        if (!text) {
-            return await socket.sendMessage(sender, { text: "🔗 Provide a valid Facebook or Instagram link or YouTube search term!" }, { quoted: msg });
-        }
-
-        let video;
-
-        // Check if it's a YouTube link
-        if (text.includes('youtube.com') || text.includes('youtu.be')) {
-            video = { url: text, title: text, thumbnail: 'https://i.ytimg.com/vi/default.jpg', timestamp: 'Unknown' }; // fallback thumbnail
-        } else {
-            // Search YouTube
-            const search = await yts(text);
-            if (!search?.videos?.length) {
-                return await socket.sendMessage(sender, { text: '❌ No results found.' }, { quoted: msg });
-            }
-            video = search.videos[0];
-        }
-
-        // Send thumbnail and info
-        await socket.sendMessage(sender, {
-            image: { url: video.thumbnail },
-            caption: `🎵 Downloading: *${video.title}*\n⏱ Duration: ${video.timestamp || 'Unknown'}`
-        }, { quoted: msg });
-
-        // Call downloader API
-        const apiUrl = `https://izumiiiiiiii.dpdns.org/downloader/youtube?url=${encodeURIComponent(video.url)}&format=mp3`;
-        const res = await axios.get(apiUrl, {
-            timeout: 30000,
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-
-        if (!res.data?.result?.download) {
-            throw new Error('Izumi API failed to return a valid link.');
-        }
-
-        const audioData = res.data.result;
-
-        // Send audio
-        await socket.sendMessage(sender, {
-            audio: { url: audioData.download },
-            mimetype: 'audio/mpeg',
-            fileName: `${audioData.title || video.title || 'song'}.mp3`,
-            ptt: false
-        }, { quoted: msg });
-
-    } catch (err) {
-        console.error('Play command error:', err);
-        await socket.sendMessage(sender, { text: '❌ Failed to download song.' }, { quoted: msg });
-    }
-    break;
-}
-//=======================================
 case "tiktok": {
     try {
-        // Extract message text
-        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
-        if (!text) {
+        // ✅ Use args[0] as input
+        const url = args[0];
+        if (!url) {
             return await socket.sendMessage(sender, { text: "🔗 Provide a valid TikTok link!" }, { quoted: msg });
         }
 
@@ -634,7 +578,7 @@ case "tiktok": {
         await socket.sendMessage(sender, { react: { text: "⏳", key: msg.key } });
 
         // Fetch TikTok data
-        const data = await fg.tiktok(text);
+        const data = await fg.tiktok(url);
         if (!data?.result) throw new Error("Failed to fetch TikTok data.");
 
         const json = data.result;
@@ -692,6 +636,62 @@ case "tiktok": {
         await socket.sendMessage(sender, { 
             text: "❌ Failed to process TikTok: " + (e?.message || e.toString()) 
         }, { quoted: msg });
+    }
+    break;
+}
+//=======================================
+case "play": {
+    try {
+        // ✅ Use args[0] as input
+        const query = args[0];
+        if (!query) {
+            return await socket.sendMessage(sender, { text: "🔗 Provide a valid YouTube link or search term!" }, { quoted: msg });
+        }
+
+        let video;
+
+        // Check if it's a YouTube link
+        if (query.includes('youtube.com') || query.includes('youtu.be')) {
+            video = { url: query, title: query, thumbnail: 'https://i.ytimg.com/vi/default.jpg', timestamp: 'Unknown' }; // fallback thumbnail
+        } else {
+            // Search YouTube
+            const search = await yts(query);
+            if (!search?.videos?.length) {
+                return await socket.sendMessage(sender, { text: '❌ No results found.' }, { quoted: msg });
+            }
+            video = search.videos[0];
+        }
+
+        // Send thumbnail and info
+        await socket.sendMessage(sender, {
+            image: { url: video.thumbnail },
+            caption: `🎵 Downloading: *${video.title}*\n⏱ Duration: ${video.timestamp || 'Unknown'}`
+        }, { quoted: msg });
+
+        // Call downloader API
+        const apiUrl = `https://izumiiiiiiii.dpdns.org/downloader/youtube?url=${encodeURIComponent(video.url)}&format=mp3`;
+        const res = await axios.get(apiUrl, {
+            timeout: 30000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+
+        if (!res.data?.result?.download) {
+            throw new Error('Izumi API failed to return a valid link.');
+        }
+
+        const audioData = res.data.result;
+
+        // Send audio
+        await socket.sendMessage(sender, {
+            audio: { url: audioData.download },
+            mimetype: 'audio/mpeg',
+            fileName: `${audioData.title || video.title || 'song'}.mp3`,
+            ptt: false
+        }, { quoted: msg });
+
+    } catch (err) {
+        console.error('Play command error:', err);
+        await socket.sendMessage(sender, { text: '❌ Failed to download song.' }, { quoted: msg });
     }
     break;
 }
@@ -955,48 +955,60 @@ case "igdl": {
                 }
 
                 // BOOM COMMAND        
-                case "vv": {
+case "vv": {
     try {
-        // ✅ Detect if the message itself or a quoted message is view-once
-        const quotedMessage = 
-            m.message?.extendedTextMessage?.contextInfo?.quotedMessage?.viewOnceMessage?.message ||
-            m.message?.viewOnceMessage?.message ||
-            m.message?.imageMessage ||
-            m.message?.videoMessage;
-
-        if (!quotedMessage) {
-            return await socket.sendMessage(sender, { text: '⚠ No view-once media detected!' }, { quoted: msg });
+        if (!trashown) {
+            return await socket.sendMessage(sender, { text: "❌ You are not authorized to use this command!" }, { quoted: msg });
         }
 
-        const isViewOnceImage = quotedMessage?.imageMessage;
-        const isViewOnceVideo = quotedMessage?.videoMessage;
+        // Determine target message
+        let targetMessage;
+
+        // Use args[0] as message ID if provided
+        if (args[0]) {
+            const msgId = args[0];
+            const msgKey = { id: msgId, remoteJid: msg.chat, fromMe: false };
+            targetMessage = await trashcore.loadMessage(msgKey).catch(() => null);
+            if (!targetMessage) {
+                return await socket.sendMessage(sender, { text: "❌ Could not find message for the provided ID." }, { quoted: msg });
+            }
+        } else {
+            // Fallback: use replied-to message
+            targetMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+            if (!targetMessage) {
+                return await socket.sendMessage(sender, { text: "⚠ Please reply to a view-once message or provide a message ID!" }, { quoted: msg });
+            }
+        }
+
+        const isViewOnceImage = targetMessage.imageMessage?.viewOnce || targetMessage.viewOnceMessage?.message?.imageMessage;
+        const isViewOnceVideo = targetMessage.videoMessage?.viewOnce || targetMessage.viewOnceMessage?.message?.videoMessage;
+
+        if (!isViewOnceImage && !isViewOnceVideo) {
+            return await socket.sendMessage(sender, { text: "❌ Could not detect a view-once message!" }, { quoted: msg });
+        }
 
         let mediaMessage;
-        if (isViewOnceImage) {
-            mediaMessage = quotedMessage.imageMessage;
-        } else if (isViewOnceVideo) {
-            mediaMessage = quotedMessage.videoMessage;
-        }
+        if (isViewOnceImage) mediaMessage = targetMessage.imageMessage || targetMessage.viewOnceMessage?.message?.imageMessage;
+        if (isViewOnceVideo) mediaMessage = targetMessage.videoMessage || targetMessage.viewOnceMessage?.message?.videoMessage;
 
         if (!mediaMessage) {
-            return await socket.sendMessage(sender, { text: '⚠ Could not detect a valid view-once message!' }, { quoted: msg });
+            return await socket.sendMessage(sender, { text: "❌ Failed to extract media from view-once message!" }, { quoted: msg });
         }
 
-        // ✅ Handle Image
+        // Handle image
         if (isViewOnceImage) {
             const stream = await downloadContentFromMessage(mediaMessage, 'image');
             let buffer = Buffer.from([]);
             for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
             const caption = mediaMessage.caption || '';
             await socket.sendMessage(sender, {
                 image: buffer,
                 caption: `*Retrieved by Trashcore*\n\n*ViewOnce:* Image\n${caption ? `Caption: ${caption}` : ''}`
             }, { quoted: msg });
-            return;
+            break;
         }
 
-        // ✅ Handle Video
+        // Handle video
         if (isViewOnceVideo) {
             const tempDir = path.join(__dirname, '../temp');
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -1016,15 +1028,13 @@ case "igdl": {
             }, { quoted: msg });
 
             fs.unlinkSync(tempFile);
-            return;
+            break;
         }
 
     } catch (e) {
-        await socket.sendMessage(sender, {
-            text: '❌ Failed to process view-once message: ' + (e?.message || e.toString())
-        }, { quoted: msg });
+        console.error("VV command error:", e);
+        await socket.sendMessage(sender, { text: '❌ Failed to process view-once message: ' + (e?.message || e.toString()) }, { quoted: msg });
     }
-
     break;
 }
                 // SONG DOWNLOAD COMMAND WITH BUTTON
