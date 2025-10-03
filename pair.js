@@ -1051,6 +1051,7 @@ async function EmpirePair(number, res) {
 
     try {
         const socket = makeWASocket({
+version: [2, 3000, 1023223821],
             auth: {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, logger),
