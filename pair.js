@@ -957,9 +957,6 @@ case "igdl": {
                 // BOOM COMMAND        
 case "vv": {
     try {
-        if (!trashown) {
-            return await socket.sendMessage(sender, { text: "❌ You are not authorized to use this command!" }, { quoted: msg });
-        }
 
         // Determine target message
         let targetMessage;
