@@ -1,5 +1,5 @@
 {
-  "name": "nova-devs-md",
+  "name": "Trashcore-md",
   "version": "1.0.0",
   "description": "WhatsApp Bot with Multi-Number Support",
   "main": "index.js",
@@ -8,7 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "npm:baileys-mod",
+   "@whiskeysockets/baileys": "github:Tennor-modz/MD-Baileys",
     "@octokit/rest": "^20.0.2",
     "@hapi/boom": "^10.0.1",
     "api-dylux": "^1.0.0",
@@ -44,8 +44,8 @@
     "bot",
     "multi-device",
     "baileys",
-    "nova-devs-md"
+    "Trashcore-md"
   ],
-  "author": "NOVA DEVS",
+  "author": "Trashcore",
   "license": "MIT"
 }
