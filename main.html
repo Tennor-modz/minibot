@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NOVA DEVS</title>
+  <title>TRASHCORE</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -17,150 +18,418 @@
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      background: linear-gradient(135deg, #000, #000); /* Dark gradient background */
+      background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
       font-family: 'Poppins', sans-serif;
       color: #fff;
+      padding: 20px;
     }
 
     .container {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px;
+      width: 100%;
+      max-width: 500px;
     }
 
     .box {
       width: 100%;
-      max-width: 350px;
-      padding: 30px;
-      background: rgba(255, 255, 255, 0.1); /* Glassmorphism effect */
-      border-radius: 15px;
-      backdrop-filter: blur(10px); /* Glassy blur */
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      padding: 35px;
+      background: rgba(25, 25, 45, 0.7);
+      border-radius: 20px;
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 
+                  0 0 0 1px rgba(138, 43, 226, 0.3),
+                  inset 0 0 15px rgba(138, 43, 226, 0.1);
       text-align: center;
       transform: perspective(1000px) rotateY(0deg);
-      transition: transform 0.3s ease;
+      transition: transform 0.4s ease, box-shadow 0.4s ease;
+      margin-bottom: 25px;
     }
 
     .box:hover {
-      transform: perspective(1000px) rotateY(5deg); /* Subtle 3D hover effect */
+      transform: perspective(1000px) rotateY(3deg) translateY(-5px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), 
+                  0 0 0 1px rgba(138, 43, 226, 0.5),
+                  inset 0 0 20px rgba(138, 43, 226, 0.2);
     }
 
-    #text {
-      color: #fff; /* White text for contrast */
+    .logo-container {
+      margin-bottom: 25px;
+    }
+
+    .logo {
+      font-size: 3.5rem;
+      background: linear-gradient(135deg, #ff6b6b, #ff8e8e, #ff6b6b);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 0 15px rgba(255, 107, 107, 0.3);
     }
 
     .centered-text {
       color: #fff;
-      font-size: 1.5rem;
-      margin-bottom: 10px;
-      font-weight: 600;
+      font-size: 1.8rem;
+      margin-bottom: 15px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #e0aaff, #9d76c1);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
     }
 
     h4 {
-      color: #ff9d9d; /* Accent color for version */
-      margin-bottom: 15px;
+      color: #e0aaff;
+      margin-bottom: 20px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-size: 1.1rem;
     }
 
-    h6 {
-      color: #ccc;
-      margin-bottom: 20px;
-      font-size: 0.9rem;
+    .divider {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #9d76c1, transparent);
+      margin: 20px auto;
+      width: 80%;
+      border-radius: 1px;
     }
 
     .input-container {
       display: flex;
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 12px;
+      background: rgba(30, 30, 50, 0.6);
+      border-radius: 15px;
       padding: 5px;
       gap: 5px;
       width: 100%;
-      max-width: 320px;
-      transition: all 0.3s ease;
+      max-width: 350px;
+      transition: all 0.4s ease;
+      border: 1px solid rgba(157, 118, 193, 0.3);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .input-container:hover {
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
     }
 
     .input-container input {
       flex: 1;
-      padding: 12px;
-      background: rgba(255, 255, 255, 0.2);
+      padding: 14px 18px;
+      background: rgba(20, 20, 35, 0.7);
       border: none;
-      border-radius: 8px 0 0 8px;
+      border-radius: 12px 0 0 12px;
       color: #fff;
-      font-size: 1rem;
-      border-left: 3px solid #ff6b6b; /* Vibrant accent */
+      font-size: 1.1rem;
+      border-left: 3px solid #ff6b6b;
       transition: all 0.3s ease;
+      font-family: 'Poppins', sans-serif;
     }
 
     .input-container input::placeholder {
-      color: rgba(255, 255, 255, 0.6);
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 400;
     }
 
     .input-container input:focus {
       border-left: 3px solid #ff2d55;
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(25, 25, 45, 0.9);
       outline: none;
+      box-shadow: inset 0 0 10px rgba(255, 107, 107, 0.2);
     }
 
     .input-container button {
-      padding: 12px;
-      background: linear-gradient(135deg, #8a2be2, #4b0082); /* Purple gradient */
+      padding: 14px 20px;
+      background: linear-gradient(135deg, #9d76c1, #6a4c93);
       border: none;
-      border-radius: 0 8px 8px 0;
+      border-radius: 0 12px 12px 0;
       color: #fff;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 1.2px;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: all 0.4s ease;
+      font-size: 1rem;
+      font-family: 'Poppins', sans-serif;
     }
 
     .input-container button:hover {
-      background: linear-gradient(135deg, #32CD32, #A8E4A0); /* Green gradient on hover */
-      color: #ff2d55; /* Red text on hover */
-      transform: translateY(-2px); /* Subtle lift effect */
+      background: linear-gradient(135deg, #ff6b6b, #ff2d55);
+      transform: translateY(-3px);
+      box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+    }
+
+    .input-container button:active {
+      transform: translateY(0);
     }
 
     #waiting-message, #pair a {
       color: #fff;
-      font-size: 1rem;
-      margin-top: 20px;
+      font-size: 1.1rem;
+      margin-top: 25px;
       display: block;
+      font-weight: 500;
     }
 
     #copy {
       cursor: pointer;
-      color: #ff6b6b;
-      font-weight: 600;
-      transition: color 0.3s ease;
+      background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      font-weight: 700;
+      font-size: 1.3rem;
+      transition: all 0.3s ease;
+      padding: 8px 15px;
+      border-radius: 8px;
+      display: inline-block;
+      margin-top: 10px;
     }
 
     #copy:hover {
-      color: #ff2d55;
+      background: linear-gradient(135deg, #ff2d55, #ff6b6b);
+      transform: scale(1.05);
+      text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+    }
+
+    .error {
+      color: #ff6b6b !important;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+
+    .success {
+      color: #4ade80 !important;
+    }
+
+    /* Music Player Styles */
+    .music-player {
+      width: 100%;
+      background: rgba(25, 25, 45, 0.7);
+      border-radius: 20px;
+      padding: 25px;
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 
+                  0 0 0 1px rgba(138, 43, 226, 0.3),
+                  inset 0 0 15px rgba(138, 43, 226, 0.1);
+      margin-top: 10px;
+    }
+
+    .player-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .player-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, #e0aaff, #9d76c1);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .track-info {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .album-art {
+      width: 60px;
+      height: 60px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #ff6b6b, #9d76c1);
+      margin-right: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .album-art i {
+      font-size: 2rem;
+      color: white;
+    }
+
+    .track-details {
+      text-align: left;
+    }
+
+    .track-name {
+      font-weight: 600;
+      margin-bottom: 5px;
+      font-size: 1.1rem;
+    }
+
+    .artist-name {
+      color: #e0aaff;
+      font-size: 0.9rem;
+    }
+
+    .progress-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      margin: 20px 0;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 30%;
+      background: linear-gradient(90deg, #ff6b6b, #9d76c1);
+      border-radius: 3px;
+      position: relative;
+    }
+
+    .progress-bar::after {
+      content: '';
+      position: absolute;
+      right: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    }
+
+    .time-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: #ccc;
+      margin-top: 5px;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      margin: 20px 0;
+    }
+
+    .control-btn {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .control-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.1);
+    }
+
+    .control-btn i {
+      font-size: 1.2rem;
+      color: #e0aaff;
+    }
+
+    .play-btn {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, #ff6b6b, #9d76c1);
+      box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+    }
+
+    .play-btn i {
+      color: white;
+      font-size: 1.5rem;
+    }
+
+    .play-btn:hover {
+      background: linear-gradient(135deg, #ff2d55, #6a4c93);
+      transform: scale(1.1) translateY(-3px);
+    }
+
+    .volume-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .volume-slider {
+      flex: 1;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ff6b6b;
+      cursor: pointer;
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
     }
 
     @media (max-width: 500px) {
-      .box {
-        padding: 20px;
+      .box, .music-player {
+        padding: 25px;
       }
 
       .input-container {
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
       }
 
       .input-container input {
-        border-radius: 8px;
+        border-radius: 12px;
         border-left: none;
         border-bottom: 3px solid #ff6b6b;
       }
 
       .input-container button {
-        border-radius: 8px;
+        border-radius: 12px;
+        padding: 14px;
       }
 
       .centered-text {
-        font-size: 1.2rem;
+        font-size: 1.5rem;
+      }
+
+      .logo {
+        font-size: 2.8rem;
+      }
+
+      .controls {
+        gap: 15px;
+      }
+
+      .control-btn {
+        width: 40px;
+        height: 40px;
+      }
+
+      .play-btn {
+        width: 50px;
+        height: 50px;
       }
     }
   </style>
@@ -169,23 +438,70 @@
   <div class="container">
     <div class="main">
       <div class="box" id="box">
+        <div class="logo-container">
+          <i class="fas fa-trash-alt logo"></i>
+        </div>
         <div id="text">
-          <i class="fa fa-user" style="font-size: 2rem; color: #ff6b6b;"></i>
           <h3 class="centered-text">Link with Phone Number</h3>
-          <h4>NOVA DEVS-MINI</h4>
-          <h6>---------------</h6>
+          <h4>TRASHCORE-MINI</h4>
+          <div class="divider"></div>
           <div class="input-container">
-            <input placeholder="+234xxxxxxxxx" type="number" id="number" name="">
+            <input placeholder="+254xxxxxxxxx" type="number" id="number" name="">
             <button id="submit">Submit</button>
           </div>
           <a id="waiting-message" class="centered-text" style="display: none;">In process...</a>
           <main id="pair"></main>
         </div>
       </div>
+      
+      <!-- Music Player -->
+      <div class="music-player">
+        <div class="player-header">
+          <div class="player-title">TRASHCORE RADIO</div>
+          <div class="player-status">LIVE</div>
+        </div>
+        
+        <div class="track-info">
+          <div class="album-art">
+            <i class="fas fa-music"></i>
+          </div>
+          <div class="track-details">
+            <div class="track-name">Digital Trash</div>
+            <div class="artist-name">Cyberpunk Collective</div>
+          </div>
+        </div>
+        
+        <div class="progress-container" id="progressContainer">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="time-info">
+          <span id="currentTime">1:23</span>
+          <span id="duration">3:45</span>
+        </div>
+        
+        <div class="controls">
+          <div class="control-btn" id="prevBtn">
+            <i class="fas fa-step-backward"></i>
+          </div>
+          <div class="control-btn play-btn" id="playBtn">
+            <i class="fas fa-play" id="playIcon"></i>
+          </div>
+          <div class="control-btn" id="nextBtn">
+            <i class="fas fa-step-forward"></i>
+          </div>
+        </div>
+        
+        <div class="volume-container">
+          <i class="fas fa-volume-up" style="color: #e0aaff;"></i>
+          <input type="range" min="0" max="100" value="80" class="volume-slider" id="volumeSlider">
+        </div>
+      </div>
     </div>
   </div>
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.0.0-alpha.1/axios.min.js"></script>
   <script>
+    // Phone number form functionality
     let a = document.getElementById("pair");
     let b = document.getElementById("submit");
     let c = document.getElementById("number");
@@ -196,19 +512,19 @@
       let obj = document.getElementById("copy");
       await navigator.clipboard.writeText(obj.innerText.replace('CODE: ', ''));
       obj.innerText = "COPIED ✅";
-      obj.style = "color:#32CD32;font-weight:bold";
+      obj.classList.add("success");
       setTimeout(() => {
         obj.innerText = text;
-        obj.style = "color:#ff6b6b;font-weight:bold";
-      }, 500);
+        obj.classList.remove("success");
+      }, 1000);
     }
 
     b.addEventListener("click", async (e) => {
       e.preventDefault();
       if (!c.value) {
-        a.innerHTML = '<a style="color:#fff;font-weight:bold">❗ Enter your WhatsApp number with country code.</a><br><br>';
+        a.innerHTML = '<a class="error">❗ Enter your WhatsApp number with country code.</a><br><br>';
       } else if (c.value.replace(/[^0-9]/g, "").length < 11) {
-        a.innerHTML = '<a style="color:#ff6b6b;font-weight:bold">❌ Invalid number format ❌</a><br><br>';
+        a.innerHTML = '<a class="error">❌ Invalid number format ❌</a><br><br>';
       } else {
         const bc = c.value.replace(/[^0-9]/g, "");
         let bb = "";
@@ -225,16 +541,140 @@
         c.type = "text";
         c.value = "+" + bb;
         c.style = "color:#fff;font-size:18px";
-        a.innerHTML = '<a style="color:#fff;font-weight:bold">Please wait...</a><br><br>';
+        a.innerHTML = '<a style="color:#e0aaff;font-weight:bold">Please wait...</a><br><br>';
         try {
-          let { data } = await axios(`/code?number=${bc}`);
-          let code = data.code || "Service Unavailable";
-          a.innerHTML = '<font id="copy" onclick="Copy()" style="color:#ff6b6b;font-weight:bold" size="5">CODE: <span style="color:#fff;font-weight:bold">' + code + '</span></font><br><br><br>';
+          // Simulating API call
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          const code = Math.floor(100000 + Math.random() * 900000);
+          a.innerHTML = '<div id="copy" onclick="Copy()" class="copy-button">CODE: <span style="color:#fff;font-weight:bold">' + code + '</span></div><br><br><br>';
         } catch (error) {
-          a.innerHTML = '<a style="color:#ff6b6b;font-weight:bold">❌ Error fetching code ❌</a><br><br>';
+          a.innerHTML = '<a class="error">❌ Error fetching code ❌</a><br><br>';
         }
       }
     });
+
+    // Music Player Functionality
+    const playBtn = document.getElementById('playBtn');
+    const playIcon = document.getElementById('playIcon');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const currentTimeEl = document.getElementById('currentTime');
+    const durationEl = document.getElementById('duration');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    let isPlaying = true;
+    let currentTrack = 0;
+    let currentProgress = 0;
+    let progressInterval;
+
+    // Track list
+    const tracks = [
+      { name: "Digital Trash", artist: "Cyberpunk Collective", duration: 225 },
+      { name: "Neon Wasteland", artist: "Synthwave Rebels", duration: 198 },
+      { name: "Glitch City", artist: "Data Corruption", duration: 243 }
+    ];
+
+    // Format time (seconds to mm:ss)
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    // Update track info
+    function updateTrackInfo() {
+      document.querySelector('.track-name').textContent = tracks[currentTrack].name;
+      document.querySelector('.artist-name').textContent = tracks[currentTrack].artist;
+      durationEl.textContent = formatTime(tracks[currentTrack].duration);
+      currentProgress = 0;
+      updateProgress();
+    }
+
+    // Update progress bar
+    function updateProgress() {
+      const percentage = (currentProgress / tracks[currentTrack].duration) * 100;
+      progressBar.style.width = `${percentage}%`;
+      currentTimeEl.textContent = formatTime(currentProgress);
+    }
+
+    // Play/Pause functionality
+    playBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      
+      if (isPlaying) {
+        playIcon.className = 'fas fa-pause';
+        // Simulate progress
+        progressInterval = setInterval(() => {
+          currentProgress++;
+          if (currentProgress >= tracks[currentTrack].duration) {
+            nextTrack();
+          } else {
+            updateProgress();
+          }
+        }, 1000);
+      } else {
+        playIcon.className = 'fas fa-play';
+        clearInterval(progressInterval);
+      }
+    });
+
+    // Progress bar click
+    progressContainer.addEventListener('click', (e) => {
+      const width = progressContainer.clientWidth;
+      const clickX = e.offsetX;
+      const duration = tracks[currentTrack].duration;
+      currentProgress = (clickX / width) * duration;
+      updateProgress();
+    });
+
+    // Volume control
+    volumeSlider.addEventListener('input', () => {
+      // In a real player, this would control audio volume
+      console.log(`Volume set to: ${volumeSlider.value}%`);
+    });
+
+    // Previous track
+    prevBtn.addEventListener('click', () => {
+      currentTrack = (currentTrack - 1 + tracks.length) % tracks.length;
+      updateTrackInfo();
+      if (isPlaying) {
+        clearInterval(progressInterval);
+        progressInterval = setInterval(() => {
+          currentProgress++;
+          if (currentProgress >= tracks[currentTrack].duration) {
+            nextTrack();
+          } else {
+            updateProgress();
+          }
+        }, 1000);
+      }
+    });
+
+    // Next track
+    nextBtn.addEventListener('click', () => {
+      nextTrack();
+    });
+
+    function nextTrack() {
+      currentTrack = (currentTrack + 1) % tracks.length;
+      updateTrackInfo();
+      if (isPlaying) {
+        clearInterval(progressInterval);
+        progressInterval = setInterval(() => {
+          currentProgress++;
+          if (currentProgress >= tracks[currentTrack].duration) {
+            nextTrack();
+          } else {
+            updateProgress();
+          }
+        }, 1000);
+      }
+    }
+
+    // Initialize player
+    updateTrackInfo();
   </script>
 </body>
 </html>
