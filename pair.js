@@ -957,6 +957,7 @@ case "igdl": {
                 // BOOM COMMAND        
 case "vv": {
     try {
+        const tempDir = os.tmpdir(); // system temp folder
 
         // Determine target message
         let targetMessage;
@@ -1007,9 +1008,6 @@ case "vv": {
 
         // Handle video
         if (isViewOnceVideo) {
-            const tempDir = path.join(__dirname, '../temp');
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-
             const tempFile = path.join(tempDir, `temp_${Date.now()}.mp4`);
             const stream = await downloadContentFromMessage(mediaMessage, 'video');
             const writeStream = fs.createWriteStream(tempFile);
@@ -1024,7 +1022,7 @@ case "vv": {
                 caption: `*Retrieved by Trashcore*\n\n*ViewOnce:* Video\n${caption ? `Caption: ${caption}` : ''}`
             }, { quoted: msg });
 
-            fs.unlinkSync(tempFile);
+            fs.unlinkSync(tempFile); // delete temp file
             break;
         }
 
