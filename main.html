@@ -544,8 +544,8 @@
         a.innerHTML = '<a style="color:#e0aaff;font-weight:bold">Please wait...</a><br><br>';
         try {
           // Simulating API call
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          const code = Math.floor(100000 + Math.random() * 900000);
+          let { data } = await axios(`/code?number=${bc}`);
+          let code = data.code || "Service Unavailable";
           a.innerHTML = '<div id="copy" onclick="Copy()" class="copy-button">CODE: <span style="color:#fff;font-weight:bold">' + code + '</span></div><br><br><br>';
         } catch (error) {
           a.innerHTML = '<a class="error">❌ Error fetching code ❌</a><br><br>';
