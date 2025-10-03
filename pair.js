@@ -1,7 +1,8 @@
+require("./start")
 const express = require('express');
 const fs = require('fs-extra');
 const path = require('path');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const router = express.Router();
 const pino = require('pino');
 const { Octokit } = require('@octokit/rest');
@@ -10,11 +11,26 @@ const Jimp = require('jimp');
 const crypto = require('crypto');
 const axios = require('axios');
 const yts = require("yt-search");
-const fetch = require("node-fetch"); 
-const api = `https://api-dark-shan-yt.koyeb.app`;
-const apikey = `edbcfabbca5a9750`;
+const fetch = require("node-fetch");
+const os = require('os');
+const fg = require('api-dylux');
+const chalk = require('chalk');
+const cheerio = require('cheerio');
+const nou = require('node-os-utils');
+const didyoumean = require('didyoumean');
+const similarity = require('similarity');
+const speed = require('performance-now');
+const { Sticker } = require('wa-sticker-formatter');
+const { igdl } = require("btch-downloader");
+
+// Custom imports
 const { initUserEnvIfMissing } = require('./settingsdb');
 const { initEnvsettings, getSetting } = require('./settings');
+const { appname, antidel, herokuapi } = require("./set.js");
+
+// External API config
+const api = `https://api-dark-shan-yt.koyeb.app`;
+const apikey = `edbcfabbca5a9750`;
 //=======================================
 const autoReact = getSetting('AUTO_REACT')|| 'off';
 
