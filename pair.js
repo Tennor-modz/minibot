@@ -483,7 +483,7 @@ const senderNumber = sender?.split("@")[0] || "";
 const trashown =
     m?.sender &&
     (
-        [botNumber, ...global.owner.map(v => v.replace(/[^0-9]/g, "") + "@s.whatsapp.net")]
+        [botNumber.map(v => v.replace(/[^0-9]/g, "") + "@s.whatsapp.net")]
         .includes(m.sender)
     );
 
@@ -541,13 +541,13 @@ case "menu":
 ║
 ║ • ping 
 ║ • menu 
-║ • play 
-║ • vv 
-║ • ytvid 
+║ • play <title>
+║ • vv (fixing)
+║ • ytvid (fixing)
 ║ • jid
 ║ • ai
 ║ • igdl
-║ • tiktok
+║ • tiktok <link>
 ║ • ai
 ║ • fb
 ╠═════════════
