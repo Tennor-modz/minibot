@@ -1,4 +1,4 @@
-
+require("./start")
 const express = require('express');
 const fs = require('fs-extra');
 const path = require('path');
@@ -496,71 +496,110 @@ function setupCommandHandlers(socket, number) {
         try {
             switch (command) {   
                 // ALIVE COMMAND WITH BUTTON
-                case "ping":
-                await socket.sendMessage(sender, { text: "Pong! ✅" }, { quoted: msg });
-                break;
+case "ping":
+    const start = Date.now(); // record start time
+    const sentMsg = await socket.sendMessage(sender, { text: "🏓 Pinging..." }, { quoted: msg });
+    const end = Date.now(); // record end time
+    const latency = end - start; // calculate latency in milliseconds
+
+    // Edit the message to include latency
+    await socket.sendMessage(sender, { text: `🏓 Pong! ✅\nBot Speed: ${latency} ms` }, { quoted: msg });
+    break;
 
 //=======================================
 case "menu":
-                await socket.sendMessage(sender, { text: "📜 Menu:\n1. Ping\n2. Menu" }, { quoted: msg });
-                break;
+    // Calculate uptime
+    const uptimeMilliseconds = process.uptime() * 1000;
+    const hours = Math.floor(uptimeMilliseconds / (1000 * 60 * 60));
+    const minutes = Math.floor((uptimeMilliseconds % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((uptimeMilliseconds % (1000 * 60)) / 1000);
+    const uptime = `${hours}h ${minutes}m ${seconds}s`;
+
+    // Build the menu text
+    const menuText = `
+╔═══════════════
+║𝗧𝗿𝗮𝗮𝗵𝗰𝗼𝗿𝗲 𝗠𝗶𝗻𝗶 𝗕𝗼𝘁
+║♡ 𝗦𝘁𝗮𝘁𝘂𝘀: Active 
+║♡ 𝗢𝘄𝗻𝗲𝗿: Trashcore 
+║♡ 𝗪𝗲𝗯: www.trashcoreweb.zone.id 
+║♡ 𝗛𝗲𝗹𝗽: 254703726139
+╠═══════════════
+║ 📌 Available Commands:
+║
+║ • ping - Check bot speed
+║ • menu - Show this menu
+║ • play - download yt song
+║
+╠═══════════════
+║ ⏱ Bot Uptime: ${uptime}
+╚═══════════════
+`;
+
+    await socket.sendMessage(sender, {
+        image: { url: "https://files.catbox.moe/njhzra.jpg" }, // Replace with your image URL or local path
+        caption: menuText
+    }, { quoted: msg });
+    break;
+
+//=======================================
+case "play": {
+    if (!text) {
+        return await socket.sendMessage(sender, { text: 'Usage: .play <song name or YouTube link>' }, { quoted: msg });
+    }
+
+    try {
+        let video;
+        if (text.includes('youtube.com') || text.includes('youtu.be')) {
+            video = { url: text };
+        } else {
+            const search = await yts(text);
+            if (!search || !search.videos.length) {
+                return await socket.sendMessage(sender, { text: 'No results found.' }, { quoted: msg });
+            }
+            video = search.videos[0];
+        }
+
+        // Send thumbnail and info
+        await socket.sendMessage(sender, {
+            image: { url: video.thumbnail },
+            caption: `🎵 Downloading: *${video.title}*\n⏱ Duration: ${video.timestamp}`
+        }, { quoted: msg });
+
+        // Call downloader API
+        const apiUrl = `https://izumiiiiiiii.dpdns.org/downloader/youtube?url=${encodeURIComponent(video.url)}&format=mp3`;
+        const res = await axios.get(apiUrl, {
+            timeout: 30000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+        });
+
+        if (!res.data || !res.data.result || !res.data.result.download) {
+            throw new Error('Izumi API failed to return a valid link.');
+        }
+
+        const audioData = res.data.result;
+
+        // Send audio
+        await socket.sendMessage(sender, {
+            audio: { url: audioData.download },
+            mimetype: 'audio/mpeg',
+            fileName: `${audioData.title || video.title || 'song'}.mp3`,
+            ptt: false
+        }, { quoted: msg });
+
+    } catch (err) {
+        console.error('Play command error:', err);
+        await socket.sendMessage(sender, { text: '❌ Failed to download song.' }, { quoted: msg });
+    }
+    break;
+}
+
 
 //=======================================
                
                 
-                // OWNER COMMAND WITH VCARD
-case 'owner': {
-    const vcard = 'BEGIN:VCARD\n' +
-        'VERSION:3.0\n' +
-        'FN:NOVA DEVS\n' +
-        'ORG:NOVA DEVS\n' +
-        'TEL;type=CELL;type=VOICE;waid=2348157763037:+234 815 776 3037\n' +
-        'EMAIL:novadevsss@gmail.com\n' +
-        'END:VCARD';
 
-    // Send contact card first
-    await socket.sendMessage(sender, {
-        contacts: {
-            displayName: "𝙉𝙊𝙑𝘼 𝘿𝙀𝙑𝙎",
-            contacts: [{ vcard }]
-        }
-    });
-
-    // Then send image with buttons as separate message
-    await socket.sendMessage(sender, {
-        image: { url: config.BUTTON_IMAGES.OWNER },
-        caption: '*💗 𝙉𝙤𝙫𝙖 𝙈𝘿 OWNER DETAILS*',
-        buttons: [
-            { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 },
-            { buttonId: `${config.PREFIX}alive`, buttonText: { displayText: '🤖 BOT INFO' }, type: 1 }
-        ]
-    });
-    break;
-}
-                // SYSTEM COMMAND
-                case 'system': {
-                    const startTime = socketCreationTime.get(number) || Date.now();
-                    const uptime = Math.floor((Date.now() - startTime) / 1000);
-                    const hours = Math.floor(uptime / 3600);
-                    const minutes = Math.floor((uptime % 3600) / 60);
-                    const seconds = Math.floor(uptime % 60);
-                        
-                    const title = '*💀 𝙉𝙤𝙫𝙖 𝙈𝘿 System 💥*';
-                    const content = `┏━━━━━━━━━━━━━━━━\n` +
-                        `┃🤖 \`ʙᴏᴛ ɴᴀᴍᴇ\` : ${config.BOT_NAME}\n` +
-                        `┃🔖 \`ᴠᴇʀsɪᴏɴ\` : ${config.BOT_VERSION}\n` +
-                        `┃📡 \`ᴘʟᴀᴛꜰᴏʀᴍ\` : Heroku\n` +
-                        `┃🪢 \`ʀᴜɴᴛɪᴍᴇ\` : ${hours}h ${minutes}m ${seconds}s\n` +
-                        `┃👨‍💻 \`ᴏᴡɴᴇʀ\` : ${config.OWNER_NAME}\n` +
-                        `┗━━━━━━━━━━━━━━━━`;
-                    const footer = config.BOT_FOOTER;
-
-                    await socket.sendMessage(sender, {
-                        image: { url: config.IMAGE_PATH },
-                        caption: formatMessage(title, content, footer)
-                    });
-                    break;
-                }
                    
                 // JID COMMAND
                 case 'jid': {
