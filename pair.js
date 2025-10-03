@@ -469,7 +469,7 @@ function setupCommandHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
         if (!msg.message || msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid === config.NEWSLETTER_JID) return;
-
+        const m = messages[0];
         let command = null;
         let args = [];
         let sender = msg.key.remoteJid;
@@ -597,86 +597,85 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
     break;
 }
 //=======================================
-case "ytvid": {
+    case "ytvid": {
 const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
-    if (!text) {
-        return await socket.sendMessage(sender, { text: '❌ Provide a YouTube URL!\n\nUse: .ytmp4 https://youtube.com/watch?v=xxxx 360p' }, { quoted: msg });
+    const axios = require('axios');
+    const input = text?.trim();
+
+    if (!input) {
+        return await socket.sendMessage(sender, {
+            text: `Usage:\n.ytmp4 https://youtu.be/xxxx,720\n\nAvailable qualities:\n- 360\n- 480\n- 720\n- 1080`
+        }, { quoted: msg });
     }
 
-    let [url, quality] = text.split(' ');
-    quality = quality || '480p';
+    const [url, q = '720'] = input.split(',').map(a => a.trim());
+    const validUrl = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//.test(url);
+    if (!validUrl) {
+        return await socket.sendMessage(sender, { text: `❌ URL YouTube is not valid!` }, { quoted: msg });
+    }
 
-    const qualityMap = {
-        '1080p': 'Full HD (1080p)',
-        '720p': 'HD (720p)',
-        '480p': 'SD (480p)',
-        '360p': 'Low (360p)',
-        '240p': 'Very Low (240p)',
-        '144p': 'Tiny (144p)'
+    const qualityMap = { "360": 360, "480": 480, "720": 720, "1080": 1080 };
+    if (!qualityMap[q]) {
+        return await socket.sendMessage(sender, { text: `❌ Quality must be valid!\nExample: 360, 480, 720, 1080` }, { quoted: msg });
+    }
+
+    const quality = qualityMap[q];
+
+    const sendResult = async (meta) => {
+        await socket.sendMessage(sender, {
+            image: { url: meta.image },
+            caption: `✅ *Title:* ${meta.title}\n📥 *Type:* MP4\n🎚️ *Quality:* ${meta.quality}p\n\nSending file...`
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, {
+            document: { url: meta.downloadUrl },
+            mimetype: 'video/mp4',
+            fileName: `${meta.title}.mp4`
+        }, { quoted: msg });
     };
 
-    if (!qualityMap[quality]) {
-        return await socket.sendMessage(sender, { text: `❌ Quality must be valid!\n\nProvide a valid format:\n${Object.keys(qualityMap).join(', ')}` }, { quoted: msg });
-    }
-
     try {
-        // Fetch video info
-        let { data } = await axios.post('https://api.ytmp4.fit/api/video-info', { url }, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Origin': 'https://ytmp4.fit',
-                'Referer': 'https://ytmp4.fit/'
+        const { data: start } = await axios.get(
+            `https://p.oceansaver.in/ajax/download.php?button=1&start=1&end=1&format=${quality}&iframe_source=https://allinonetools.com/&url=${encodeURIComponent(url)}`,
+            { timeout: 30000, headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }
+        );
+
+        if (!start.progress_url) return await socket.sendMessage(sender, { text: `❌ Failed to start progress.` }, { quoted: msg });
+
+        let progressUrl = start.progress_url;
+        let meta = {
+            image: start.info?.image || "https://telegra.ph/file/fd0028db8c3fc25d85726.jpg",
+            title: start.info?.title || "Unknown Title",
+            downloadUrl: "",
+            quality: q,
+            type: "mp4"
+        };
+
+        let polling, attempts = 0;
+        const maxTry = 40;
+        await socket.sendMessage(sender, { text: '⏳ Processing video...' }, { quoted: msg });
+
+        do {
+            if (attempts >= maxTry) return await socket.sendMessage(sender, { text: `❌ Timeout process!` }, { quoted: msg });
+            await new Promise(r => setTimeout(r, 3000));
+            try {
+                const { data } = await axios.get(progressUrl, { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } });
+                polling = data;
+                if (polling.progress < 100) console.log(`Progress: ${polling.progress}%`);
+            } catch (e) {
+                console.log(`Polling attempt ${attempts + 1} failed`);
             }
-        });
+            attempts++;
+        } while (!polling?.download_url);
 
-        if (!data || !data.title) throw new Error('Failed to get video info.');
+        if (!polling.download_url) return await socket.sendMessage(sender, { text: `❌ Failed to get download link.` }, { quoted: msg });
 
-        let { title, duration, channel, views, thumbnail } = data;
+        meta.downloadUrl = polling.download_url;
+        return await sendResult(meta);
 
-        // Send info message
-        await socket.sendMessage(sender, {
-            text: `🎬 *YouTube Video Info:*\n\n📌 Title: ${title}\n📺 Channel: ${channel}\n⏱ Duration: ${duration}\n👁 Views: ${views}\n\n⏳ Fetching Quality: *${qualityMap[quality]}*...`,
-            contextInfo: {
-                externalAdReply: {
-                    title: title,
-                    body: channel,
-                    thumbnailUrl: thumbnail,
-                    mediaType: 1,
-                    renderLargerThumbnail: true,
-                    sourceUrl: url
-                }
-            }
-        }, { quoted: msg });
-
-        // Download video
-        let videoRes = await axios.post('https://api.ytmp4.fit/api/download', { url, quality }, {
-            responseType: 'arraybuffer',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/octet-stream',
-                'Origin': 'https://ytmp4.fit',
-                'Referer': 'https://ytmp4.fit/',
-            }
-        });
-
-        if (!videoRes.headers['content-type'].includes('video')) {
-            throw new Error('An error occurred while fetching the video.');
-        }
-
-        let filename = decodeURIComponent(
-            (videoRes.headers['content-disposition'] || '').split("filename*=UTF-8''")[1] || `video_${quality}.mp4`
-        ).replace(/[\/\\:*?"<>|]/g, '_');
-
-        // Send video
-        await socket.sendMessage(sender, {
-            video: Buffer.from(videoRes.data),
-            mimetype: 'video/mp4',
-            fileName: filename,
-            caption: `✅ *Video successfully downloaded!*\n\n📌 Title: ${title}\n🎞️ Quality: ${qualityMap[quality]}\n\nPowered by ${botname || 'Trashcore'}`
-        }, { quoted: msg });
-
-    } catch (err) {
-        await socket.sendMessage(sender, { text: `❌ Error: ${err.message}` }, { quoted: msg });
+    } catch (e) {
+        console.error(e);
+        return await socket.sendMessage(sender, { text: `❌ An error occurred: ${e.message || 'err'}` }, { quoted: msg });
     }
 
     break;
