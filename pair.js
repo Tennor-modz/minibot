@@ -26,7 +26,7 @@ const { igdl } = require("btch-downloader");
 // Custom imports
 const { initUserEnvIfMissing } = require('./settingsdb');
 const { initEnvsettings, getSetting } = require('./settings');
-const { appname, antidel, herokuapi } = require("./set.js");
+
 
 // External API config
 const api = `https://api-dark-shan-yt.koyeb.app`;
