@@ -1,4 +1,4 @@
-
+require('./trashenv')
 const express = require('express');
 const fs = require('fs-extra');
 const path = require('path');
@@ -473,6 +473,19 @@ function setupCommandHandlers(socket, number) {
         let command = null;
         let args = [];
         let sender = msg.key.remoteJid;
+// ✅ Get bot number safely
+const botNumber = (socket?.user?.id?.split(":")[0] || "") + "@s.whatsapp.net";
+
+// ✅ Get sender number
+const senderNumber = sender?.split("@")[0] || "";
+
+// ✅ Check if the message sender is the owner
+const trashown =
+    m?.sender &&
+    (
+        [botNumber, ...global.owner.map(v => v.replace(/[^0-9]/g, "") + "@s.whatsapp.net")]
+        .includes(m.sender)
+    );
 
         if (msg.message.conversation || msg.message.extendedTextMessage?.text) {
             const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
@@ -531,9 +544,15 @@ case "menu":
 ║ • play 
 ║ • vv 
 ║ • ytvid 
-╠═══════════════
+║ • jid
+║ • ai
+║ • igdl
+║ • tiktok
+║ • ai
+║ • fb
+╠═════════════
 ║ ⏱ Bot Uptime: ${uptime}
-╚═══════════════
+╚═════════════
 `;
 
     await socket.sendMessage(sender, {
@@ -597,26 +616,240 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
     break;
 }
 //=======================================
-    case "ytvid": {
+case "tiktok": {
 const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
+    try {
+        if (!text) {
+            return await socket.sendMessage(sender, { 
+                text: `⚠ Use: ${prefix + command} <link>` 
+            }, { quoted: msg });
+        }
+
+        // ✅ React loading
+        await socket.sendMessage(sender, { react: { text: "⏳", key: msg.key } });
+
+        let data = await fg.tiktok(text);
+        if (!data || !data.result) throw new Error("Failed to fetch TikTok data.");
+
+        let json = data.result;
+
+        // ✅ Build caption
+        let caption = `📥 *TIKTOK - DOWNLOAD*\n\n`;
+        caption += `◦ *ID* : ${json.id}\n`;
+        caption += `◦ *Username* : ${json.author?.nickname || "N/A"}\n`;
+        caption += `◦ *Title* : ${json.title || "N/A"}\n`;
+        caption += `◦ *Likes* : ${json.digg_count}\n`;
+        caption += `◦ *Comments* : ${json.comment_count}\n`;
+        caption += `◦ *Shares* : ${json.share_count}\n`;
+        caption += `◦ *Plays* : ${json.play_count}\n`;
+        caption += `◦ *Created* : ${json.create_time}\n`;
+        caption += `◦ *Size* : ${json.size}\n`;
+        caption += `◦ *Duration* : ${json.duration}`;
+
+        // ✅ If TikTok post has images
+        if (json.images && json.images.length > 0) {
+            for (const img of json.images) {
+                await socket.sendMessage(sender, { 
+                    image: { url: img }, 
+                    caption: caption 
+                }, { quoted: msg });
+            }
+        } 
+        // ✅ If TikTok post is a video
+        else {
+            await socket.sendMessage(sender, { 
+                video: { url: json.play }, 
+                mimetype: "video/mp4", 
+                caption: caption 
+            }, { quoted: msg });
+
+            // Send music after delay
+            setTimeout(async () => {
+                await socket.sendMessage(sender, { 
+                    audio: { url: json.music }, 
+                    mimetype: "audio/mpeg" 
+                }, { quoted: msg });
+            }, 3000);
+        }
+
+        // ✅ React success
+        await socket.sendMessage(sender, { react: { text: "✅", key: msg.key } });
+
+    } catch (e) {
+        await socket.sendMessage(sender, { react: { text: "❌", key: msg.key } });
+        await socket.sendMessage(sender, { 
+            text: "❌ Failed to process TikTok: " + (e?.message || e.toString()) 
+        }, { quoted: msg });
+    }
+    break;
+}
+case "setprefix": {
+    try {
+        // ✅ Only owner can run this
+        if (!trashown) {
+            return await socket.sendMessage(sender, { 
+                text: mess.owner 
+            }, { quoted: msg });
+        }
+
+        // ✅ Check if prefix is provided
+        if (!text) {
+            return await socket.sendMessage(sender, { 
+                text: `⚠ Example: ${prefix + command} <desired prefix>` 
+            }, { quoted: msg });
+        }
+
+        // ✅ Set new prefix
+        config.PREFIX = text;
+
+        await socket.sendMessage(sender, { 
+            text: `✅ Prefix successfully changed to *${text}*` 
+        }, { quoted: msg });
+
+    } catch (e) {
+        await socket.sendMessage(sender, { 
+            text: "❌ Failed to change prefix: " + (e?.message || e.toString()) 
+        }, { quoted: msg });
+    }
+    break;
+}
+//=======================================
+case "fb":
+case "facebook":
+case "fbdl":
+case "ig":
+case "instagram":
+case "igdl": {
+    try {
+        if (!args[0]) {
+            return await socket.sendMessage(sender, { text: "🔗 Provide a valid Facebook or Instagram link!" }, { quoted: msg });
+        }
+
+        const axios = require('axios');
+        const cheerio = require('cheerio');
+
+        async function yt5sIo(url) {
+            try {
+                const form = new URLSearchParams();
+                form.append("q", url);
+                form.append("vt", "home");
+
+                const { data } = await axios.post("https://yt5s.io/api/ajaxSearch", form, {
+                    headers: {
+                        "Accept": "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                });
+
+                if (data.status !== "ok") throw new Error("Provide a valid link.");
+
+                const $ = cheerio.load(data.data);
+
+                // ✅ Facebook
+                if (/^(https?:\/\/)?(www\.)?(facebook\.com|fb\.watch)\/.+/i.test(url)) {
+                    const thumb = $("img").attr("src");
+                    let links = [];
+
+                    $("table tbody tr").each((_, el) => {
+                        const quality = $(el).find(".video-quality").text().trim();
+                        const link = $(el).find("a.download-link-fb").attr("href");
+                        if (quality && link) links.push({ quality, link });
+                    });
+
+                    if (links.length > 0) {
+                        return { platform: "facebook", type: "video", thumb, media: links[0].link };
+                    } else if (thumb) {
+                        return { platform: "facebook", type: "image", media: thumb };
+                    } else {
+                        throw new Error("Invalid Facebook media.");
+                    }
+                }
+
+                // ✅ Instagram
+                else if (/^(https?:\/\/)?(www\.)?(instagram\.com\/(p|reel)\/).+/i.test(url)) {
+                    const video = $('a[title="Download Video"]').attr("href");
+                    const image = $("img").attr("src");
+
+                    if (video) {
+                        return { platform: "instagram", type: "video", media: video };
+                    } else if (image) {
+                        return { platform: "instagram", type: "image", media: image };
+                    } else {
+                        throw new Error("Invalid Instagram media.");
+                    }
+                }
+
+                throw new Error("Provide a valid URL.");
+            } catch (err) {
+                return { error: err.message };
+            }
+        }
+
+        // ✅ React loading
+        await socket.sendMessage(sender, { react: { text: "⏳", key: msg.key } });
+
+        let res = await yt5sIo(args[0]);
+
+        if (res.error) {
+            await socket.sendMessage(sender, { react: { text: "❌", key: msg.key } });
+            return await socket.sendMessage(sender, { text: `⚠ Error: ${res.error}` }, { quoted: msg });
+        }
+
+        // ✅ Send media
+        if (res.type === "video") {
+            await socket.sendMessage(sender, {
+                video: { url: res.media },
+                caption: `✅ *Downloaded by Trashcore Media Team!*`
+            }, { quoted: msg });
+        } else if (res.type === "image") {
+            await socket.sendMessage(sender, {
+                image: { url: res.media },
+                caption: `✅ *Downloaded photo by Trashcore Media Team!*`
+            }, { quoted: msg });
+        }
+
+    } catch (e) {
+        await socket.sendMessage(sender, {
+            react: { text: "❌", key: msg.key }
+        });
+        await socket.sendMessage(sender, {
+            text: "❌ Failed to fetch media: " + (e?.message || e.toString())
+        }, { quoted: msg });
+    }
+    break;
+}
+//=======================================
+    case "ytvid": {
     const axios = require('axios');
-    const input = text?.trim();
+
+    // ✅ Safely extract text from message
+    const text =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        msg.message?.extendedTextMessage?.caption ||
+        "";
+
+    const input = text.trim();
 
     if (!input) {
         return await socket.sendMessage(sender, {
-            text: `Usage:\n.ytmp4 https://youtu.be/xxxx,720\n\nAvailable qualities:\n- 360\n- 480\n- 720\n- 1080`
+            text: `Usage:\n.ytvid https://youtu.be/xxxx,720\n\nAvailable qualities:\n- 360\n- 480\n- 720\n- 1080`
         }, { quoted: msg });
     }
 
     const [url, q = '720'] = input.split(',').map(a => a.trim());
     const validUrl = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//.test(url);
+
     if (!validUrl) {
-        return await socket.sendMessage(sender, { text: `❌ URL YouTube is not valid!` }, { quoted: msg });
+        return await socket.sendMessage(sender, { text: `❌ YouTube URL is not valid!` }, { quoted: msg });
     }
 
     const qualityMap = { "360": 360, "480": 480, "720": 720, "1080": 1080 };
     if (!qualityMap[q]) {
-        return await socket.sendMessage(sender, { text: `❌ Quality must be valid!\nExample: 360, 480, 720, 1080` }, { quoted: msg });
+        return await socket.sendMessage(sender, {
+            text: `❌ Invalid quality!\nExample: 360, 480, 720, 1080`
+        }, { quoted: msg });
     }
 
     const quality = qualityMap[q];
@@ -637,10 +870,15 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
     try {
         const { data: start } = await axios.get(
             `https://p.oceansaver.in/ajax/download.php?button=1&start=1&end=1&format=${quality}&iframe_source=https://allinonetools.com/&url=${encodeURIComponent(url)}`,
-            { timeout: 30000, headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }
+            {
+                timeout: 30000,
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+            }
         );
 
-        if (!start.progress_url) return await socket.sendMessage(sender, { text: `❌ Failed to start progress.` }, { quoted: msg });
+        if (!start?.progress_url) {
+            return await socket.sendMessage(sender, { text: `❌ Failed to start progress.` }, { quoted: msg });
+        }
 
         let progressUrl = start.progress_url;
         let meta = {
@@ -656,26 +894,39 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
         await socket.sendMessage(sender, { text: '⏳ Processing video...' }, { quoted: msg });
 
         do {
-            if (attempts >= maxTry) return await socket.sendMessage(sender, { text: `❌ Timeout process!` }, { quoted: msg });
+            if (attempts >= maxTry) {
+                return await socket.sendMessage(sender, { text: `❌ Timeout process!` }, { quoted: msg });
+            }
+
             await new Promise(r => setTimeout(r, 3000));
+
             try {
-                const { data } = await axios.get(progressUrl, { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } });
+                const { data } = await axios.get(progressUrl, {
+                    timeout: 15000,
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+                });
+
                 polling = data;
-                if (polling.progress < 100) console.log(`Progress: ${polling.progress}%`);
+                if (polling.progress < 100) {
+                    console.log(`Progress: ${polling.progress}%`);
+                }
             } catch (e) {
                 console.log(`Polling attempt ${attempts + 1} failed`);
             }
+
             attempts++;
         } while (!polling?.download_url);
 
-        if (!polling.download_url) return await socket.sendMessage(sender, { text: `❌ Failed to get download link.` }, { quoted: msg });
+        if (!polling.download_url) {
+            return await socket.sendMessage(sender, { text: `❌ Failed to get download link.` }, { quoted: msg });
+        }
 
         meta.downloadUrl = polling.download_url;
         return await sendResult(meta);
 
     } catch (e) {
         console.error(e);
-        return await socket.sendMessage(sender, { text: `❌ An error occurred: ${e.message || 'err'}` }, { quoted: msg });
+        return await socket.sendMessage(sender, { text: `❌ Error: ${e.message || 'Unknown error'}` }, { quoted: msg });
     }
 
     break;
@@ -698,35 +949,37 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
                 // BOOM COMMAND        
                 case "vv": {
     try {
-        const quotedMessage = m.message?.extendedTextMessage?.contextInfo?.quotedMessage ||
-                              m.message?.imageMessage ||
-                              m.message?.videoMessage;
+        // ✅ Detect if the message itself or a quoted message is view-once
+        const quotedMessage = 
+            m.message?.extendedTextMessage?.contextInfo?.quotedMessage?.viewOnceMessage?.message ||
+            m.message?.viewOnceMessage?.message ||
+            m.message?.imageMessage ||
+            m.message?.videoMessage;
 
-        if (!m.quoted) {
-            return await socket.sendMessage(sender, { text: '⚠ Please reply to a view-once message!' }, { quoted: msg });
+        if (!quotedMessage) {
+            return await socket.sendMessage(sender, { text: '⚠ No view-once media detected!' }, { quoted: msg });
         }
 
-        const isViewOnceImage = quotedMessage.imageMessage?.viewOnce === true || quotedMessage.viewOnceMessage?.message?.imageMessage;
-        const isViewOnceVideo = quotedMessage.videoMessage?.viewOnce === true || quotedMessage.viewOnceMessage?.message?.videoMessage;
+        const isViewOnceImage = quotedMessage?.imageMessage;
+        const isViewOnceVideo = quotedMessage?.videoMessage;
 
         let mediaMessage;
         if (isViewOnceImage) {
-            mediaMessage = quotedMessage.imageMessage || quotedMessage.viewOnceMessage?.message?.imageMessage;
+            mediaMessage = quotedMessage.imageMessage;
         } else if (isViewOnceVideo) {
-            mediaMessage = quotedMessage.videoMessage || quotedMessage.viewOnceMessage?.message?.videoMessage;
+            mediaMessage = quotedMessage.videoMessage;
         }
 
         if (!mediaMessage) {
-            return await socket.sendMessage(sender, { text: '⚠ Could not detect a view-once message!' }, { quoted: msg });
+            return await socket.sendMessage(sender, { text: '⚠ Could not detect a valid view-once message!' }, { quoted: msg });
         }
 
-        // Handle Image
+        // ✅ Handle Image
         if (isViewOnceImage) {
             const stream = await downloadContentFromMessage(mediaMessage, 'image');
             let buffer = Buffer.from([]);
-            for await (const chunk of stream) {
-                buffer = Buffer.concat([buffer, chunk]);
-            }
+            for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
             const caption = mediaMessage.caption || '';
             await socket.sendMessage(sender, {
                 image: buffer,
@@ -735,13 +988,15 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
             return;
         }
 
-        // Handle Video
+        // ✅ Handle Video
         if (isViewOnceVideo) {
             const tempDir = path.join(__dirname, '../temp');
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
             const tempFile = path.join(tempDir, `temp_${Date.now()}.mp4`);
             const stream = await downloadContentFromMessage(mediaMessage, 'video');
             const writeStream = fs.createWriteStream(tempFile);
+
             for await (const chunk of stream) writeStream.write(chunk);
             writeStream.end();
             await new Promise(resolve => writeStream.on('finish', resolve));
@@ -757,99 +1012,30 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
         }
 
     } catch (e) {
-        await socket.sendMessage(sender, { text: '❌ Failed to process view-once message: ' + (e?.message || e.toString()) }, { quoted: msg });
+        await socket.sendMessage(sender, {
+            text: '❌ Failed to process view-once message: ' + (e?.message || e.toString())
+        }, { quoted: msg });
     }
 
     break;
 }
                 // SONG DOWNLOAD COMMAND WITH BUTTON
-                case 'song': {
-                    try {
-                        const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
-                        const q = text.split(" ").slice(1).join(" ").trim();
-                        if (!q) {
-                            await socket.sendMessage(sender, { 
-                                text: '*🚫 Please enter a song name to search.*',
-                                buttons: [
-                                    { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
-                                ]
-                            });
-                            return;
-                        }
+                case "ai": {
+    try {
+        if (!args[0]) {
+            return await socket.sendMessage(sender, { text: '⚠ Please provide a query.' }, { quoted: msg });
+        }
 
-                        const searchResults = await yts(q);
-                        if (!searchResults.videos.length) {
-                            await socket.sendMessage(sender, { 
-                                text: '*🚩 Result Not Found*',
-                                buttons: [
-                                    { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
-                                ]
-                            });    
-                            return;
-                        }
+        const res = await fetch(`https://api.nekolabs.my.id/ai/copilot?text=${encodeURIComponent(args.join(' '))}`);
+        const data = await res.json();
 
-                        const video = searchResults.videos[0];
+        await socket.sendMessage(sender, { text: data.result.text }, { quoted: msg });
 
-                        // API CALL
-                        const apiUrl = `${api}/download/ytmp3?url=${encodeURIComponent(video.url)}&apikey=${apikey}`;
-                        const response = await fetch(apiUrl);
-                        const data = await response.json();
-
-                        if (!data.status || !data.data?.result) {
-                            await socket.sendMessage(sender, { 
-                                text: '*🚩 Download Error. Please try again later.*',
-                                buttons: [
-                                    { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
-                                ]
-                            });
-                            return;
-                        }
-
-                        const { title, uploader, duration, quality, format, thumbnail, download } = data.data.result;
-
-                        const titleText = '*༊ NOVA MD SONG DOWNLOAD*';
-                        const content = `┏━━━━━━━━━━━━━━━━\n` +
-                            `┃📝 \`Title\` : ${video.title}\n` +
-                            `┃📈 \`Views\` : ${video.views}\n` +
-                            `┃🕛 \`Duration\` : ${video.timestamp}\n` +
-                            `┃🔗 \`URL\` : ${video.url}\n` +
-                            `┗━━━━━━━━━━━━━━━━`;
-
-                        const footer = config.BOT_FOOTER || '';
-                        const captionMessage = formatMessage(titleText, content, footer);
-
-                        await socket.sendMessage(sender, {
-                            image: { url: config.BUTTON_IMAGES.SONG },
-                            caption: captionMessage,
-                            buttons: [
-                                { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 },
-                                { buttonId: `${config.PREFIX}alive`, buttonText: { displayText: '🤖 BOT INFO' }, type: 1 }
-                            ]
-                        });
-
-                        await socket.sendMessage(sender, {
-                            audio: { url: download },
-                            mimetype: 'audio/mpeg'
-                        });
-
-                        await socket.sendMessage(sender, {
-                            document: { url: download },
-                            mimetype: "audio/mpeg",
-                            fileName: `${video.title}.mp3`,
-                            caption: captionMessage
-                        });
-
-                    } catch (err) {
-                        console.error(err);
-                        await socket.sendMessage(sender, { 
-                            text: '*❌ Internal Error. Please try again later.*',
-                            buttons: [
-                                { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
-                            ]
-                        });
-                    }
-                    break;
-                }
+    } catch (e) {
+        await socket.sendMessage(sender, { text: `❌ Error: ${e.message}` }, { quoted: msg });
+    }
+    break;
+}
                 
                 // NEWS COMMAND
                 case 'news': {
