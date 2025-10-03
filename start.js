@@ -54,7 +54,17 @@ if (global.db) setInterval(async () => {
 let phoneNumber = "254104245659"
 
 //------------------------------------------------------
+const { state, saveCreds } = await useMultiFileAuthState('./auth')
 
+  const trashcore = makeWASocket({
+    logger: pino({ level: 'silent' }),
+    printQRInTerminal: true,
+    auth: state,
+    browser: ["Trashcore-Bot", "Chrome", "1.0.0"]
+  })
+
+  // save creds when updated
+  trashcore.ev.on('creds.update', saveCreds)
 
 
 	            
