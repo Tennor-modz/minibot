@@ -567,19 +567,23 @@ case "menu": {
 //=======================================
 //=======================================
 case "play": {
-const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
-    if (!text) {
-        return await socket.sendMessage(sender, { text: 'Usage: .play <song name or YouTube link>' }, { quoted: msg });
-    }
-
     try {
+        // Extract message text
+        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
+        if (!text) {
+            return await socket.sendMessage(sender, { text: "🔗 Provide a valid Facebook or Instagram link or YouTube search term!" }, { quoted: msg });
+        }
+
         let video;
+
+        // Check if it's a YouTube link
         if (text.includes('youtube.com') || text.includes('youtu.be')) {
-            video = { url: text };
+            video = { url: text, title: text, thumbnail: 'https://i.ytimg.com/vi/default.jpg', timestamp: 'Unknown' }; // fallback thumbnail
         } else {
+            // Search YouTube
             const search = await yts(text);
-            if (!search || !search.videos.length) {
-                return await socket.sendMessage(sender, { text: 'No results found.' }, { quoted: msg });
+            if (!search?.videos?.length) {
+                return await socket.sendMessage(sender, { text: '❌ No results found.' }, { quoted: msg });
             }
             video = search.videos[0];
         }
@@ -587,19 +591,17 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
         // Send thumbnail and info
         await socket.sendMessage(sender, {
             image: { url: video.thumbnail },
-            caption: `🎵 Downloading: *${video.title}*\n⏱ Duration: ${video.timestamp}`
+            caption: `🎵 Downloading: *${video.title}*\n⏱ Duration: ${video.timestamp || 'Unknown'}`
         }, { quoted: msg });
 
         // Call downloader API
         const apiUrl = `https://izumiiiiiiii.dpdns.org/downloader/youtube?url=${encodeURIComponent(video.url)}&format=mp3`;
         const res = await axios.get(apiUrl, {
             timeout: 30000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
+            headers: { 'User-Agent': 'Mozilla/5.0' }
         });
 
-        if (!res.data || !res.data.result || !res.data.result.download) {
+        if (!res.data?.result?.download) {
             throw new Error('Izumi API failed to return a valid link.');
         }
 
@@ -621,37 +623,37 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
 }
 //=======================================
 case "tiktok": {
-const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
     try {
+        // Extract message text
+        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
         if (!text) {
-            return await socket.sendMessage(sender, { 
-                text: `⚠ Use: ${prefix + command} <link>` 
-            }, { quoted: msg });
+            return await socket.sendMessage(sender, { text: "🔗 Provide a valid TikTok link!" }, { quoted: msg });
         }
 
         // ✅ React loading
         await socket.sendMessage(sender, { react: { text: "⏳", key: msg.key } });
 
-        let data = await fg.tiktok(text);
-        if (!data || !data.result) throw new Error("Failed to fetch TikTok data.");
+        // Fetch TikTok data
+        const data = await fg.tiktok(text);
+        if (!data?.result) throw new Error("Failed to fetch TikTok data.");
 
-        let json = data.result;
+        const json = data.result;
 
         // ✅ Build caption
         let caption = `📥 *TIKTOK - DOWNLOAD*\n\n`;
-        caption += `◦ *ID* : ${json.id}\n`;
+        caption += `◦ *ID* : ${json.id || "N/A"}\n`;
         caption += `◦ *Username* : ${json.author?.nickname || "N/A"}\n`;
         caption += `◦ *Title* : ${json.title || "N/A"}\n`;
-        caption += `◦ *Likes* : ${json.digg_count}\n`;
-        caption += `◦ *Comments* : ${json.comment_count}\n`;
-        caption += `◦ *Shares* : ${json.share_count}\n`;
-        caption += `◦ *Plays* : ${json.play_count}\n`;
-        caption += `◦ *Created* : ${json.create_time}\n`;
-        caption += `◦ *Size* : ${json.size}\n`;
-        caption += `◦ *Duration* : ${json.duration}`;
+        caption += `◦ *Likes* : ${json.digg_count || 0}\n`;
+        caption += `◦ *Comments* : ${json.comment_count || 0}\n`;
+        caption += `◦ *Shares* : ${json.share_count || 0}\n`;
+        caption += `◦ *Plays* : ${json.play_count || 0}\n`;
+        caption += `◦ *Created* : ${json.create_time || "N/A"}\n`;
+        caption += `◦ *Size* : ${json.size || "N/A"}\n`;
+        caption += `◦ *Duration* : ${json.duration || "N/A"}`;
 
-        // ✅ If TikTok post has images
-        if (json.images && json.images.length > 0) {
+        // ✅ Send images if present
+        if (json.images?.length > 0) {
             for (const img of json.images) {
                 await socket.sendMessage(sender, { 
                     image: { url: img }, 
@@ -659,27 +661,33 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
                 }, { quoted: msg });
             }
         } 
-        // ✅ If TikTok post is a video
-        else {
+        // ✅ Send video if no images
+        else if (json.play) {
             await socket.sendMessage(sender, { 
                 video: { url: json.play }, 
                 mimetype: "video/mp4", 
                 caption: caption 
             }, { quoted: msg });
 
-            // Send music after delay
-            setTimeout(async () => {
-                await socket.sendMessage(sender, { 
-                    audio: { url: json.music }, 
-                    mimetype: "audio/mpeg" 
-                }, { quoted: msg });
-            }, 3000);
+            // Send music after delay if available
+            if (json.music) {
+                setTimeout(async () => {
+                    await socket.sendMessage(sender, { 
+                        audio: { url: json.music }, 
+                        mimetype: "audio/mpeg" 
+                    }, { quoted: msg });
+                }, 3000);
+            }
+        } else {
+            // Fallback if neither video nor images
+            await socket.sendMessage(sender, { text: "❌ No video or images found in TikTok post." }, { quoted: msg });
         }
 
         // ✅ React success
         await socket.sendMessage(sender, { react: { text: "✅", key: msg.key } });
 
     } catch (e) {
+        console.error("TikTok command error:", e);
         await socket.sendMessage(sender, { react: { text: "❌", key: msg.key } });
         await socket.sendMessage(sender, { 
             text: "❌ Failed to process TikTok: " + (e?.message || e.toString()) 
@@ -687,7 +695,7 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
     }
     break;
 }
-case "setprefix": {
+/*case "setprefix": {
     try {
         // ✅ Get the new prefix from args
         const newPrefix = args[0];
@@ -712,7 +720,7 @@ case "setprefix": {
         }, { quoted: msg });
     }
     break;
-}
+}*/
 //=======================================
 case "fb":
 case "facebook":
