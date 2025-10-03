@@ -520,7 +520,7 @@ case "ping":
     break;
 
 //=======================================
-case "menu":
+case "menu": {
     // Calculate uptime
     const uptimeMilliseconds = process.uptime() * 1000;
     const hours = Math.floor(uptimeMilliseconds / (1000 * 60 * 60));
@@ -528,11 +528,11 @@ case "menu":
     const seconds = Math.floor((uptimeMilliseconds % (1000 * 60)) / 1000);
     const uptime = `${hours}h ${minutes}m ${seconds}s`;
 
-    // Build the menu text
+    // Menu text
     const menuText = `
 ╔═══════════════
 ║𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲 𝗠𝗶𝗻𝗶 𝗕𝗼𝘁
-║♡ 𝗦𝘁𝗮𝘁𝘂𝘀: Active 
+║♡ 𝗦𝘁𝗮𝘁𝘂s: Active 
 ║♡ 𝗢𝘄𝗻𝗲𝗿: Trashcore 
 ║♡ 𝗪𝗲𝗯: www.trashcoreweb.zone.id 
 ║♡ 𝗛𝗲𝗹𝗽: 254703726139
@@ -555,11 +555,59 @@ case "menu":
 ╚═════════════
 `;
 
+    // Send short looping video with caption (GIF-like)
     await socket.sendMessage(sender, {
-        image: { url: "https://files.catbox.moe/njhzra.jpg" }, // Replace with your image URL or local path
-        caption: menuText
+        video: { url: "https://files.catbox.moe/hwkini.mp4" }, // Your looping video
+        caption: menuText,
+        gifPlayback: false // must be false to allow audio
     }, { quoted: msg });
+
+    // Send audio separately
+    await socket.sendMessage(sender, {
+        audio: { url: "https://files.catbox.moe/xwbkmr.mp3" }, 
+        mimetype: "audio/mp4",
+        ptt: false // normal audio
+    }, { quoted: msg });
+
     break;
+}
+//=======================================
+case "private": {
+    try {
+        socket.public = false;
+
+        // Reply confirmation
+        await socket.sendMessage(sender, { 
+            text: '*✅ Successful in Changing To Self Usage*' 
+        }, { quoted: msg });
+
+    } catch (e) {
+        console.error("Private command error:", e);
+        await socket.sendMessage(sender, { 
+            text: '❌ An error occurred while executing the command.' 
+        }, { quoted: msg });
+    }
+    break;
+}
+
+//=======================================
+case "public": {
+    try {
+        socket.public = true;
+
+        // Reply confirmation
+        await socket.sendMessage(sender, { 
+            text: '*✅ Successful in Changing To Public Usage*' 
+        }, { quoted: msg });
+
+    } catch (e) {
+        console.error("Public command error:", e);
+        await socket.sendMessage(sender, { 
+            text: '❌ An error occurred while executing the command.' 
+        }, { quoted: msg });
+    }
+    break;
+}
 
 //=======================================
 case "play": {
@@ -684,6 +732,7 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
     break;
 }
 case "setprefix": {
+const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
     try {
         // ✅ Check if prefix is provided
         if (!text) {
