@@ -541,13 +541,13 @@ case "menu": {
 ║
 ║ • ping 
 ║ • menu 
-║ • play <title>
-║ • vv (fixing)
+║ • play 
+║ • vv 
 ║ • ytvid (fixing)
 ║ • jid
 ║ • ai
 ║ • igdl
-║ • tiktok <link>
+║ • tiktok 
 ║ • ai
 ║ • fb
 ╠═════════════
