@@ -521,14 +521,14 @@ case "ping":
 
 //=======================================
 case "menu": {
-    // Calculate uptime
+    // ✅ Calculate uptime
     const uptimeMilliseconds = process.uptime() * 1000;
     const hours = Math.floor(uptimeMilliseconds / (1000 * 60 * 60));
     const minutes = Math.floor((uptimeMilliseconds % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((uptimeMilliseconds % (1000 * 60)) / 1000);
     const uptime = `${hours}h ${minutes}m ${seconds}s`;
 
-    // Menu text
+    // ✅ Build menu text
     const menuText = `
 ╔═══════════════
 ║𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲 𝗠𝗶𝗻𝗶 𝗕𝗼𝘁
@@ -555,60 +555,16 @@ case "menu": {
 ╚═════════════
 `;
 
-    // Send short looping video with caption (GIF-like)
+    // ✅ Send GIF (video with looping)
     await socket.sendMessage(sender, {
-        video: { url: "https://files.catbox.moe/hwkini.mp4" }, // Your looping video
+        video: { url: "https://files.catbox.moe/hwkini.mp4" }, // Replace with your video
         caption: menuText,
-        gifPlayback: false // must be false to allow audio
-    }, { quoted: msg });
-
-    // Send audio separately
-    await socket.sendMessage(sender, {
-        audio: { url: "https://files.catbox.moe/xwbkmr.mp3" }, 
-        mimetype: "audio/mp4",
-        ptt: false // normal audio
+        gifPlayback: true // ✅ makes it behave like a GIF
     }, { quoted: msg });
 
     break;
 }
 //=======================================
-case "private": {
-    try {
-        socket.public = false;
-
-        // Reply confirmation
-        await socket.sendMessage(sender, { 
-            text: '*✅ Successful in Changing To Self Usage*' 
-        }, { quoted: msg });
-
-    } catch (e) {
-        console.error("Private command error:", e);
-        await socket.sendMessage(sender, { 
-            text: '❌ An error occurred while executing the command.' 
-        }, { quoted: msg });
-    }
-    break;
-}
-
-//=======================================
-case "public": {
-    try {
-        socket.public = true;
-
-        // Reply confirmation
-        await socket.sendMessage(sender, { 
-            text: '*✅ Successful in Changing To Public Usage*' 
-        }, { quoted: msg });
-
-    } catch (e) {
-        console.error("Public command error:", e);
-        await socket.sendMessage(sender, { 
-            text: '❌ An error occurred while executing the command.' 
-        }, { quoted: msg });
-    }
-    break;
-}
-
 //=======================================
 case "play": {
 const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
@@ -732,23 +688,25 @@ const text = (msg.message.conversation || msg.message.extendedTextMessage.text |
     break;
 }
 case "setprefix": {
-const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
     try {
-        // ✅ Check if prefix is provided
-        if (!text) {
+        // ✅ Get the new prefix from args
+        const newPrefix = args[0];
+        
+        if (!newPrefix) {
             return await socket.sendMessage(sender, { 
-                text: `⚠ Example: ${prefix + command} <desired prefix>` 
+                text: "⚠ Please provide a new prefix!" 
             }, { quoted: msg });
         }
 
         // ✅ Set new prefix
-        config.PREFIX = text;
+        config.PREFIX = newPrefix;
 
         await socket.sendMessage(sender, { 
-            text: `✅ Prefix successfully changed to *${text}*` 
+            text: `✅ Prefix successfully changed to *${newPrefix}*` 
         }, { quoted: msg });
 
     } catch (e) {
+        console.error("Setprefix error:", e);
         await socket.sendMessage(sender, { 
             text: "❌ Failed to change prefix: " + (e?.message || e.toString()) 
         }, { quoted: msg });
