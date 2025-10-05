@@ -1,7 +1,9 @@
-require('./trashenv')
+
 const express = require('express');
 const fs = require('fs-extra');
 const path = require('path');
+const FormData = require('form-data');
+const { fromBuffer } = require('file-type');
 const { exec, execSync } = require('child_process');
 const router = express.Router();
 const pino = require('pino');
@@ -565,6 +567,54 @@ case "menu": {
     break;
 }
 //=======================================
+case "tourl":
+case "tolink": {
+    if (!/image|video|audio|application/.test(mime)) {
+        return await socket.sendMessage(sender, { 
+            text: `⚠️ Reply to a media message (image, video, audio, or document) to upload it!`
+        }, { quoted: msg });
+    }
+    const tmpDir = path.join(__dirname, './session/tmp');
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+
+    async function uploadToCatbox(buffer) {
+        try {
+            const { ext } = await fromBuffer(buffer);
+            const form = new FormData();
+            form.append('fileToUpload', buffer, 'file.' + ext);
+            form.append('reqtype', 'fileupload');
+
+            const res = await fetch('https://catbox.moe/user/api.php', {
+                method: 'POST',
+                body: form,
+            });
+
+            return await res.text();
+        } catch (err) {
+            console.error('Upload Error:', err);
+            return null;
+        }
+    }
+
+    try {
+        const buffer = await socket.downloadMediaMessage(msg.quoted || msg);
+        const filePath = path.join(tmpDir, Date.now() + '.bin');
+        fs.writeFileSync(filePath, buffer);
+
+        const url = await uploadToCatbox(buffer);
+        if (!url || !url.startsWith('https://')) {
+            throw new Error('Upload failed');
+        }
+
+        await socket.sendMessage(sender, { text: `✅ Uploaded Successfully!\n\n🔗 *URL:* ${url}` }, { quoted: msg });
+
+        fs.unlinkSync(filePath);
+    } catch (err) {
+        console.error('Tourl Error:', err);
+        await socket.sendMessage(sender, { text: '❌ Failed to upload media to URL.' }, { quoted: msg });
+    }
+    break;
+}
 //=======================================
 case "tiktok": {
     try {
@@ -641,47 +691,55 @@ case "tiktok": {
 }
 //=======================================
 case "play": {
-    try {
-        // ✅ Use args[0] as input
-        const query = args[0];
-        if (!query) {
-            return await socket.sendMessage(sender, { text: "🔗 Provide a valid YouTube link or search term!" }, { quoted: msg });
-        }
+    const text =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        msg.message?.extendedTextMessage?.caption ||
+        "";
 
+    if (!text) {
+        return await socket.sendMessage(sender, { 
+            text: `🎵 Usage: ${prefix + command} <song name or YouTube link>` 
+        }, { quoted: msg });
+    }
+
+    try {
         let video;
 
-        // Check if it's a YouTube link
-        if (query.includes('youtube.com') || query.includes('youtu.be')) {
-            video = { url: query, title: query, thumbnail: 'https://i.ytimg.com/vi/default.jpg', timestamp: 'Unknown' }; // fallback thumbnail
+        // ✅ Check if user provided a YouTube link or search text
+        if (text.includes('youtube.com') || text.includes('youtu.be')) {
+            video = { url: text };
         } else {
-            // Search YouTube
-            const search = await yts(query);
-            if (!search?.videos?.length) {
-                return await socket.sendMessage(sender, { text: '❌ No results found.' }, { quoted: msg });
+            const search = await yts(text);
+            if (!search || !search.videos.length) {
+                return await socket.sendMessage(sender, { text: `❌ No results found.` }, { quoted: msg });
             }
             video = search.videos[0];
         }
 
-        // Send thumbnail and info
+        // 🖼 Send video thumbnail + info
         await socket.sendMessage(sender, {
             image: { url: video.thumbnail },
-            caption: `🎵 Downloading: *${video.title}*\n⏱ Duration: ${video.timestamp || 'Unknown'}`
+            caption: `🎧 *Downloading Song...*\n\n🎵 Title: *${video.title}*\n⏱ Duration: ${video.timestamp}`
         }, { quoted: msg });
 
-        // Call downloader API
+        // 🎶 Fetch audio using Izumi API
         const apiUrl = `https://izumiiiiiiii.dpdns.org/downloader/youtube?url=${encodeURIComponent(video.url)}&format=mp3`;
         const res = await axios.get(apiUrl, {
             timeout: 30000,
-            headers: { 'User-Agent': 'Mozilla/5.0' }
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
         });
 
-        if (!res.data?.result?.download) {
-            throw new Error('Izumi API failed to return a valid link.');
+        // ✅ Validate response
+        if (!res.data || !res.data.result || !res.data.result.download) {
+            throw new Error('Izumi API failed to return a valid download link.');
         }
 
         const audioData = res.data.result;
 
-        // Send audio
+        // 🎵 Send MP3 audio file
         await socket.sendMessage(sender, {
             audio: { url: audioData.download },
             mimetype: 'audio/mpeg',
@@ -691,8 +749,73 @@ case "play": {
 
     } catch (err) {
         console.error('Play command error:', err);
-        await socket.sendMessage(sender, { text: '❌ Failed to download song.' }, { quoted: msg });
+        await socket.sendMessage(sender, { text: '❌ Failed to download or send the song.' }, { quoted: msg });
     }
+
+    break;
+}
+//=======================================
+case "playvideo":
+case "ytmp4": {
+    const text =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        msg.message?.extendedTextMessage?.caption ||
+        "";
+
+    if (!text) {
+        return await socket.sendMessage(sender, { 
+            text: `🎬 Usage: ${prefix + command} <video name or YouTube link>` 
+        }, { quoted: msg });
+    }
+
+    try {
+        let video;
+
+        // ✅ Check if it's a direct YouTube link or search term
+        if (text.includes('youtube.com') || text.includes('youtu.be')) {
+            video = { url: text };
+        } else {
+            const search = await yts(text);
+            if (!search || !search.videos.length) {
+                return await socket.sendMessage(sender, { text: `❌ No video found.` }, { quoted: msg });
+            }
+            video = search.videos[0];
+        }
+
+        // 🖼 Send video info before downloading
+        await socket.sendMessage(sender, {
+            image: { url: video.thumbnail },
+            caption: `🎥 *Downloading Video...*\n\n📺 Title: *${video.title}*\n⏱ Duration: ${video.timestamp}`
+        }, { quoted: msg });
+
+        // 📡 Fetch video from Izumi API
+        const apiUrl = `https://izumiiiiiiii.dpdns.org/downloader/youtube?url=${encodeURIComponent(video.url)}&format=mp4`;
+        const res = await axios.get(apiUrl, {
+            timeout: 60000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+        });
+
+        if (!res.data || !res.data.result || !res.data.result.download) {
+            throw new Error('Izumi API did not return a valid video link.');
+        }
+
+        const videoData = res.data.result;
+
+        // 🎞 Send MP4 video
+        await socket.sendMessage(sender, {
+            video: { url: videoData.download },
+            mimetype: 'video/mp4',
+            caption: `🎬 *${videoData.title || video.title || 'YouTube Video'}*`
+        }, { quoted: msg });
+
+    } catch (err) {
+        console.error('Playvideo command error:', err);
+        await socket.sendMessage(sender, { text: '❌ Failed to download video.' }, { quoted: msg });
+    }
+
     break;
 }
 /*case "setprefix": {
