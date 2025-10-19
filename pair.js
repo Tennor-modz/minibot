@@ -4,7 +4,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const FormData = require('form-data');
 const { fromBuffer } = require('file-type');
-const { exec, execSync } = require('child_process');
+const { exec } = require('child_process');
 const router = express.Router();
 const pino = require('pino');
 const { Octokit } = require('@octokit/rest');
@@ -28,88 +28,21 @@ const { igdl } = require("btch-downloader");
 // Custom imports
 const { initUserEnvIfMissing } = require('./settingsdb');
 const { initEnvsettings, getSetting } = require('./settings');
+const handleCommand = require('./case');
+const config = require('./config');
+const { loadSettings } = require('./settingsManager');
+global.settings = loadSettings();
 
-
-// External API config
-const api = `https://api-dark-shan-yt.koyeb.app`;
-const apikey = `edbcfabbca5a9750`;
-//=======================================
-const autoReact = getSetting('AUTO_REACT')|| 'off';
-
-//=======================================
-const {
+const { 
     default: makeWASocket,
     useMultiFileAuthState,
     delay,
     makeCacheableSignalKeyStore,
     Browsers,
-    jidNormalizedUser,
-    proto,downloadContentFromMessage,
-    prepareWAMessageMedia,
-    generateWAMessageFromContent
+    jidNormalizedUser
 } = require('@whiskeysockets/baileys');
-//=======================================
-const config = {
-    AUTO_VIEW_STATUS: 'true',
-    AUTO_LIKE_STATUS: 'true',
-    AUTO_RECORDING: 'true',
-    AUTO_LIKE_EMOJI: ['🧩', '🍉', '💜', '🌸', '🪴', '💊', '💫', '🍂', '🌟', '🎋', '😶‍🌫️', '🫀', '🧿', '👀', '🤖', '🚩', '🥰', '🗿', '💜', '💙', '🌝', '🖤', '💚'],
-    PREFIX: '.',
-    MAX_RETRIES: 3,
-    GROUP_INVITE_LINK: 'https://chat.whatsapp.com/CzFlFQrkdzxFw0pxCBYM7H?mode=ems_copy_t',
-    ADMIN_LIST_PATH: './admin.json',
-    IMAGE_PATH: 'https://files.catbox.moe/dc5opm.jpg',
-    NEWSLETTER_JID: '120363322464215140@newsletter',
-    NEWSLETTER_MESSAGE_ID: '428',
-    OTP_EXPIRY: 300000,
-    NEWS_JSON_URL: '',
-    BOT_NAME: '𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲 𝗠𝗱',
-    OWNER_NAME: '𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲',
-    OWNER_NUMBER: '254703726139',
-    BOT_VERSION: '9.0.0',
-    BOT_FOOTER: '> © Made by Trashcore devs',
-    CHANNEL_LINK: 'https://whatsapp.com/channel/0029VafrbsKG8l5EFBDDCy41',
-    BUTTON_IMAGES: {
-        ALIVE: 'https://files.catbox.moe/dc5opm.jpg',
-        MENU: 'https://files.catbox.moe/dc5opm.jpg',
-        OWNER: 'https://files.catbox.moe/dc5opm.jpg',
-        SONG: 'https://files.catbox.moe/dc5opm.jpg',
-        VIDEO: 'https://files.catbox.moe/dc5opm.jpg'
-    }
-};
 
-// List Message Generator
-function generateListMessage(text, buttonTitle, sections) {
-    return {
-        text: text,
-        footer: config.BOT_FOOTER,
-        title: buttonTitle,
-        buttonText: "Select",
-        sections: sections
-    };
-}
-//=======================================
-// Button Message Generator with Image Support
-function generateButtonMessage(content, buttons, image = null) {
-    const message = {
-        text: content,
-        footer: config.BOT_FOOTER,
-        buttons: buttons,
-        headerType: 1 // Default to text header
-    };
-//=======================================
-    // Add image if provided
-    if (image) {
-        message.headerType = 4; // Image header
-        message.image = typeof image === 'string' ? { url: image } : image;
-    }
-
-    return message;
-}
-//=======================================
-const octokit = new Octokit({
-    auth: process.env.GITHUB_TOKEN
-});
+const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const owner = process.env.GITHUB_REPO_OWNER;
 const repo = process.env.GITHUB_REPO_NAME;
 
@@ -119,10 +52,9 @@ const SESSION_BASE_PATH = './session';
 const NUMBER_LIST_PATH = './numbers.json';
 const otpStore = new Map();
 
-if (!fs.existsSync(SESSION_BASE_PATH)) {
-    fs.mkdirSync(SESSION_BASE_PATH, { recursive: true });
-}
-//=======================================
+if (!fs.existsSync(SESSION_BASE_PATH)) fs.mkdirSync(SESSION_BASE_PATH, { recursive: true });
+
+//======================== Helper Functions ========================
 function loadAdmins() {
     try {
         if (fs.existsSync(config.ADMIN_LIST_PATH)) {
@@ -134,35 +66,66 @@ function loadAdmins() {
         return [];
     }
 }
+
 function formatMessage(title, content, footer) {
     return `${title}\n\n${content}\n\n${footer}`;
 }
+
 function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
+
 function getSriLankaTimestamp() {
     return moment().tz('Asia/Colombo').format('YYYY-MM-DD HH:mm:ss');
 }
+
+//======================== Auto Features ========================
+async function autoReadPrivate(socket, m) {
+    try {
+        const from = m.key.remoteJid;
+        if (from.endsWith("@g.us")) return;
+        if (!global.settings?.autoread?.enabled) return;
+        await socket.readMessages([m.key]);
+    } catch (err) {
+        console.error("AutoRead Error:", err);
+    }
+}
+
+async function autoRecordPrivate(socket, m) {
+    try {
+        const from = m.key.remoteJid;
+        if (from.endsWith("@g.us")) return;
+        if (!global.settings?.autorecord?.enabled) return;
+        await socket.sendPresenceUpdate("recording", from);
+    } catch (err) {
+        console.error("AutoRecord Error:", err);
+    }
+}
+
+async function autoTypingPrivate(socket, m) {
+    try {
+        const from = m.key.remoteJid;
+        if (from.endsWith("@g.us")) return;
+        if (!global.settings?.autotyping?.enabled) return;
+        await socket.sendPresenceUpdate("composing", from);
+    } catch (err) {
+        console.error("AutoTyping Error:", err);
+    }
+}
+
+//======================== GitHub Session Functions ========================
 async function cleanDuplicateFiles(number) {
     try {
         const sanitizedNumber = number.replace(/[^0-9]/g, '');
-        const { data } = await octokit.repos.getContent({
-            owner,
-            repo,
-            path: 'session'
-        });
+        const { data } = await octokit.repos.getContent({ owner, repo, path: 'session' });
 
-        const sessionFiles = data.filter(file => 
+        const sessionFiles = data.filter(file =>
             file.name.startsWith(`empire_${sanitizedNumber}_`) && file.name.endsWith('.json')
         ).sort((a, b) => {
             const timeA = parseInt(a.name.match(/empire_\d+_(\d+)\.json/)?.[1] || 0);
             const timeB = parseInt(b.name.match(/empire_\d+_(\d+)\.json/)?.[1] || 0);
             return timeB - timeA;
         });
-
-        const configFiles = data.filter(file => 
-            file.name === `config_${sanitizedNumber}.json`
-        );
 
         if (sessionFiles.length > 1) {
             for (let i = 1; i < sessionFiles.length; i++) {
@@ -176,1134 +139,27 @@ async function cleanDuplicateFiles(number) {
                 console.log(`Deleted duplicate session file: ${sessionFiles[i].name}`);
             }
         }
-
-        if (configFiles.length > 1) {
-            console.log(`Config file for ${sanitizedNumber} already exists`);
-        }
     } catch (error) {
         console.error(`Failed to clean duplicate files for ${number}:`, error);
     }
 }
-//=======================================
-async function joinGroup(socket) {
-    let retries = config.MAX_RETRIES;
-    const inviteCodeMatch = config.GROUP_INVITE_LINK.match(/chat\.whatsapp\.com\/([a-zA-Z0-9]+)/);
-    if (!inviteCodeMatch) {
-        console.error('Invalid group invite link format');
-        return { status: 'failed', error: 'Invalid group invite link' };
-    }
-    const inviteCode = inviteCodeMatch[1];
 
-    while (retries > 0) {
-        try {
-            const response = await socket.groupAcceptInvite(inviteCode);
-            if (response?.gid) {
-                console.log(`Successfully joined group with ID: ${response.gid}`);
-                return { status: 'success', gid: response.gid };
-            }
-            throw new Error('No group ID in response');
-        } catch (error) {
-            retries--;
-            let errorMessage = error.message || 'Unknown error';
-            if (error.message.includes('not-authorized')) {
-                errorMessage = 'Bot is not authorized to join (possibly banned)';
-            } else if (error.message.includes('conflict')) {
-                errorMessage = 'Bot is already a member of the group';
-            } else if (error.message.includes('gone')) {
-                errorMessage = 'Group invite link is invalid or expired';
-            }
-            console.warn(`Failed to join group, retries left: ${retries}`, errorMessage);
-            if (retries === 0) {
-                return { status: 'failed', error: errorMessage };
-            }
-            await delay(2000 * (config.MAX_RETRIES - retries));
-        }
-    }
-    return { status: 'failed', error: 'Max retries reached' };
-}
-//=======================================
-async function sendAdminConnectMessage(socket, number, groupResult) {
-    const admins = loadAdmins();
-    const groupStatus = groupResult.status === 'success'
-        ? `Joined (ID: ${groupResult.gid})`
-        : `Failed to join group: ${groupResult.error}`;
-    const caption = formatMessage(
-        '*Connected Successful ✅*',
-        `📞 Number: ${number}\n🩵 Status: Online`,
-        `${config.BOT_FOOTER}`
-    );
-
-    for (const admin of admins) {
-        try {
-            await socket.sendMessage(
-                `${admin}@s.whatsapp.net`,
-                {
-                    image: { url: config.IMAGE_PATH },
-                    caption
-                }
-            );
-        } catch (error) {
-            console.error(`Failed to send connect message to admin ${admin}:`, error);
-        }
-    }
-}
-//=======================================
-async function sendOTP(socket, number, otp) {
-    const userJid = jidNormalizedUser(socket.user.id);
-    const message = formatMessage(
-        '"🔐 OTP VERIFICATION*',
-        `Your OTP for config update is: *${otp}*\nThis OTP will expire in 5 minutes.`,
-        `${config.BOT_FOOTER}`
-    );
-
-    try {
-        await socket.sendMessage(userJid, { text: message });
-        console.log(`OTP ${otp} sent to ${number}`);
-    } catch (error) {
-        console.error(`Failed to send OTP to ${number}:`, error);
-        throw error;
-    }
-}
-//=======================================
-function setupNewsletterHandlers(socket) {
-    socket.ev.on('messages.upsert', async ({ messages }) => {
-        const message = messages[0];
-        if (!message?.key || message.key.remoteJid !== config.NEWSLETTER_JID) return;
-
-        try {
-            const emojis = ['❤️'];
-            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-            const messageId = message.newsletterServerId;
-
-            if (!messageId) {
-                console.warn('No valid newsletterServerId found:', message);
-                return;
-            }
-
-            let retries = config.MAX_RETRIES;
-            while (retries > 0) {
-                try {
-                    await socket.newsletterReactMessage(
-                        config.NEWSLETTER_JID,
-                        messageId.toString(),
-                        randomEmoji
-                    );
-                    console.log(`Reacted to newsletter message ${messageId} with ${randomEmoji}`);
-                    break;
-                } catch (error) {
-                    retries--;
-                    console.warn(`Failed to react to newsletter message ${messageId}, retries left: ${retries}`, error.message);
-                    if (retries === 0) throw error;
-                    await delay(2000 * (config.MAX_RETRIES - retries));
-                }
-            }
-        } catch (error) {
-            console.error('Newsletter reaction error:', error);
-        }
-    });
-}
-//=======================================
-async function setupStatusHandlers(socket) {
-    socket.ev.on('messages.upsert', async ({ messages }) => {
-        const message = messages[0];
-        if (!message?.key || message.key.remoteJid !== 'status@broadcast' || !message.key.participant || message.key.remoteJid === config.NEWSLETTER_JID) return;
-
-        try {
-            if (autoReact === 'on' && message.key.remoteJid) {
-                await socket.sendPresenceUpdate("recording", message.key.remoteJid);
-            }
-
-            if (config.AUTO_VIEW_STATUS === 'true') {
-                let retries = config.MAX_RETRIES;
-                while (retries > 0) {
-                    try {
-                        await socket.readMessages([message.key]);
-                        break;
-                    } catch (error) {
-                        retries--;
-                        console.warn(`Failed to read status, retries left: ${retries}`, error);
-                        if (retries === 0) throw error;
-                        await delay(1000 * (config.MAX_RETRIES - retries));
-                    }
-                }
-            }
-
-            if (config.AUTO_LIKE_STATUS === 'true') {
-                const randomEmoji = config.AUTO_LIKE_EMOJI[Math.floor(Math.random() * config.AUTO_LIKE_EMOJI.length)];
-                let retries = config.MAX_RETRIES;
-                while (retries > 0) {
-                    try {
-                        await socket.sendMessage(
-                            message.key.remoteJid,
-                            { react: { text: randomEmoji, key: message.key } },
-                            { statusJidList: [message.key.participant] }
-                        );
-                        console.log(`Reacted to status with ${randomEmoji}`);
-                        break;
-                    } catch (error) {
-                        retries--;
-                        console.warn(`Failed to react to status, retries left: ${retries}`, error);
-                        if (retries === 0) throw error;
-                        await delay(1000 * (config.MAX_RETRIES - retries));
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Status handler error:', error);
-        }
-    });
-}
-//=======================================
-async function handleMessageRevocation(socket, number) {
-    socket.ev.on('messages.delete', async ({ keys }) => {
-        if (!keys || keys.length === 0) return;
-
-        const messageKey = keys[0];
-        const userJid = jidNormalizedUser(socket.user.id);
-        const deletionTime = getSriLankaTimestamp();
-        
-        const message = formatMessage(
-            '╭──◯',
-            `│ \`D E L E T E\`\n│ *⦁ From :* ${messageKey.remoteJid}\n│ *⦁ Time:* ${deletionTime}\n│ *⦁ Type: Normal*\n╰──◯`,
-            `${config.BOT_FOOTER}`
-        );
-
-        try {
-            await socket.sendMessage(userJid, {
-                image: { url: config.IMAGE_PATH },
-                caption: message
-            });
-            console.log(`Notified ${number} about message deletion: ${messageKey.id}`);
-        } catch (error) {
-            console.error('Failed to send deletion notification:', error);
-        }
-    });
-}
-
-// Image resizing function
-async function resize(image, width, height) {
-    let oyy = await Jimp.read(image);
-    let kiyomasa = await oyy.resize(width, height).getBufferAsync(Jimp.MIME_JPEG);
-    return kiyomasa;
-}
-
-// Capitalize first letter
-function capital(string) {
-    return string.charAt(0).toUpperCase() + string.slice(1);
-}
-
-// Generate serial
-const createSerial = (size) => {
-    return crypto.randomBytes(size).toString('hex').slice(0, size);
-}
-
-// Send slide with news items
-async function SendSlide(socket, jid, newsItems) {
-    let anu = [];
-    for (let item of newsItems) {
-        let imgBuffer;
-        try {
-            imgBuffer = await resize(item.thumbnail, 300, 200);
-        } catch (error) {
-            console.error(`Failed to resize image for ${item.title}:`, error);
-            imgBuffer = await Jimp.read('https://i.ibb.co/PJvjMx9/20250717-093632.jpg');
-            imgBuffer = await imgBuffer.resize(300, 200).getBufferAsync(Jimp.MIME_JPEG);
-        }
-        let imgsc = await prepareWAMessageMedia({ image: imgBuffer }, { upload: socket.waUploadToServer });
-        anu.push({
-            body: proto.Message.InteractiveMessage.Body.fromObject({
-                text: `*${capital(item.title)}*\n\n${item.body}`
-            }),
-            header: proto.Message.InteractiveMessage.Header.fromObject({
-                hasMediaAttachment: true,
-                ...imgsc
-            }),
-            nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.fromObject({
-                buttons: [
-                    {
-                        name: "cta_url",
-                        buttonParamsJson: `{"display_text":"𝐃𝙴𝙿𝙻𝙾𝚈","url":"https:/","merchant_url":"https://www.google.com"}`
-                    },
-                    {
-                        name: "cta_url",
-                        buttonParamsJson: `{"display_text":"𝐂𝙾𝙽𝚃𝙰𝙲𝚃","url":"https","merchant_url":"https://www.google.com"}`
-                    }
-                ]
-            })
-        });
-    }
-    const msgii = await generateWAMessageFromContent(jid, {
-        viewOnceMessage: {
-            message: {
-                messageContextInfo: {
-                    deviceListMetadata: {},
-                    deviceListMetadataVersion: 2
-                },
-                interactiveMessage: proto.Message.InteractiveMessage.fromObject({
-                    body: proto.Message.InteractiveMessage.Body.fromObject({
-                        text: "*Latest News Updates*"
-                    }),
-                    carouselMessage: proto.Message.InteractiveMessage.CarouselMessage.fromObject({
-                        cards: anu
-                    })
-                })
-            }
-        }
-    }, { userJid: jid });
-    return socket.relayMessage(jid, msgii.message, {
-        messageId: msgii.key.id
-    });
-}
-
-// Fetch news from API
-async function fetchNews() {
-    try {
-        const response = await axios.get(config.NEWS_JSON_URL);
-        return response.data || [];
-    } catch (error) {
-        console.error('Failed to fetch news from raw JSON URL:', error.message);
-        return [];
-    }
-}
-
-// Setup command handlers with buttons and images
-function setupCommandHandlers(socket, number) {
-    socket.ev.on('messages.upsert', async ({ messages }) => {
-        const msg = messages[0];
-        if (!msg.message || msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid === config.NEWSLETTER_JID) return;
-        const m = messages[0];
-        let command = null;
-        let args = [];
-        let sender = msg.key.remoteJid;
-// ✅ Get bot number safely
-const botNumber = (socket?.user?.id?.split(":")[0] || "") + "@s.whatsapp.net";
-
-// ✅ Get sender number
-const senderNumber = sender?.split("@")[0] || "";
-
-// ✅ Check if the message sender is the owner
-const trashown =
-    m?.sender &&
-    (
-        [botNumber.map(v => v.replace(/[^0-9]/g, "") + "@s.whatsapp.net")]
-        .includes(m.sender)
-    );
-
-        if (msg.message.conversation || msg.message.extendedTextMessage?.text) {
-            const text = (msg.message.conversation || msg.message.extendedTextMessage.text || '').trim();
-            if (text.startsWith(config.PREFIX)) {
-                const parts = text.slice(config.PREFIX.length).trim().split(/\s+/);
-                command = parts[0].toLowerCase();
-                args = parts.slice(1);
-            }
-        }
-        else if (msg.message.buttonsResponseMessage) {
-            const buttonId = msg.message.buttonsResponseMessage.selectedButtonId;
-            if (buttonId && buttonId.startsWith(config.PREFIX)) {
-                const parts = buttonId.slice(config.PREFIX.length).trim().split(/\s+/);
-                command = parts[0].toLowerCase();
-                args = parts.slice(1);
-            }
-        }
-
-        if (!command) return;
-
-        try {
-            switch (command) {   
-                // ALIVE COMMAND WITH BUTTON
-case "ping":
-    const start = Date.now(); // record start time
-    const sentMsg = await socket.sendMessage(sender, { text: "🏓 Pinging..." }, { quoted: msg });
-    const end = Date.now(); // record end time
-    const latency = end - start; // calculate latency in milliseconds
-
-    // Edit the message to include latency
-    await socket.sendMessage(sender, { text: `🏓 Pong! ✅\nBot Speed: ${latency} ms` }, { quoted: msg });
-    break;
-
-//=======================================
-case "menu": {
-    // ✅ Calculate uptime
-    const uptimeMilliseconds = process.uptime() * 1000;
-    const hours = Math.floor(uptimeMilliseconds / (1000 * 60 * 60));
-    const minutes = Math.floor((uptimeMilliseconds % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((uptimeMilliseconds % (1000 * 60)) / 1000);
-    const uptime = `${hours}h ${minutes}m ${seconds}s`;
-
-    // ✅ Build menu text
-    const menuText = `
-╔═══════════════
-║𝗧𝗿𝗮𝘀𝗵𝗰𝗼𝗿𝗲 𝗠𝗶𝗻𝗶 𝗕𝗼𝘁
-║♡ 𝗦𝘁𝗮𝘁𝘂s: Active 
-║♡ 𝗢𝘄𝗻𝗲𝗿: Trashcore 
-║♡ 𝗪𝗲𝗯: www.trashcoreweb.zone.id 
-║♡ 𝗛𝗲𝗹𝗽: 254703726139
-╠═════════════
-║ 📌Commands:
-║
-║ • ping 
-║ • menu 
-║ • play 
-║ • vv 
-║ • ytvid (fixing)
-║ • jid
-║ • ai
-║ • igdl
-║ • tiktok 
-║ • ai
-║ • fb
-╠═════════════
-║ ⏱ Bot Uptime: ${uptime}
-╚═════════════
-`;
-
-    // ✅ Send GIF (video with looping)
-    await socket.sendMessage(sender, {
-        video: { url: "https://files.catbox.moe/hwkini.mp4" }, // Replace with your video
-        caption: menuText,
-        gifPlayback: true // ✅ makes it behave like a GIF
-    }, { quoted: msg });
-
-    break;
-}
-//=======================================
-case "tourl":
-case "tolink": {
-    if (!/image|video|audio|application/.test(mime)) {
-        return await socket.sendMessage(sender, { 
-            text: `⚠️ Reply to a media message (image, video, audio, or document) to upload it!`
-        }, { quoted: msg });
-    }
-    const tmpDir = path.join(__dirname, './session/tmp');
-    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-
-    async function uploadToCatbox(buffer) {
-        try {
-            const { ext } = await fromBuffer(buffer);
-            const form = new FormData();
-            form.append('fileToUpload', buffer, 'file.' + ext);
-            form.append('reqtype', 'fileupload');
-
-            const res = await fetch('https://catbox.moe/user/api.php', {
-                method: 'POST',
-                body: form,
-            });
-
-            return await res.text();
-        } catch (err) {
-            console.error('Upload Error:', err);
-            return null;
-        }
-    }
-
-    try {
-        const buffer = await socket.downloadMediaMessage(msg.quoted || msg);
-        const filePath = path.join(tmpDir, Date.now() + '.bin');
-        fs.writeFileSync(filePath, buffer);
-
-        const url = await uploadToCatbox(buffer);
-        if (!url || !url.startsWith('https://')) {
-            throw new Error('Upload failed');
-        }
-
-        await socket.sendMessage(sender, { text: `✅ Uploaded Successfully!\n\n🔗 *URL:* ${url}` }, { quoted: msg });
-
-        fs.unlinkSync(filePath);
-    } catch (err) {
-        console.error('Tourl Error:', err);
-        await socket.sendMessage(sender, { text: '❌ Failed to upload media to URL.' }, { quoted: msg });
-    }
-    break;
-}
-//=======================================
-case "tiktok": {
-    try {
-        // ✅ Use args[0] as input
-        const url = args[0];
-        if (!url) {
-            return await socket.sendMessage(sender, { text: "🔗 Provide a valid TikTok link!" }, { quoted: msg });
-        }
-
-        // ✅ React loading
-        await socket.sendMessage(sender, { react: { text: "⏳", key: msg.key } });
-
-        // Fetch TikTok data
-        const data = await fg.tiktok(url);
-        if (!data?.result) throw new Error("Failed to fetch TikTok data.");
-
-        const json = data.result;
-
-        // ✅ Build caption
-        let caption = `📥 *TIKTOK - DOWNLOAD*\n\n`;
-        caption += `◦ *ID* : ${json.id || "N/A"}\n`;
-        caption += `◦ *Username* : ${json.author?.nickname || "N/A"}\n`;
-        caption += `◦ *Title* : ${json.title || "N/A"}\n`;
-        caption += `◦ *Likes* : ${json.digg_count || 0}\n`;
-        caption += `◦ *Comments* : ${json.comment_count || 0}\n`;
-        caption += `◦ *Shares* : ${json.share_count || 0}\n`;
-        caption += `◦ *Plays* : ${json.play_count || 0}\n`;
-        caption += `◦ *Created* : ${json.create_time || "N/A"}\n`;
-        caption += `◦ *Size* : ${json.size || "N/A"}\n`;
-        caption += `◦ *Duration* : ${json.duration || "N/A"}`;
-
-        // ✅ Send images if present
-        if (json.images?.length > 0) {
-            for (const img of json.images) {
-                await socket.sendMessage(sender, { 
-                    image: { url: img }, 
-                    caption: caption 
-                }, { quoted: msg });
-            }
-        } 
-        // ✅ Send video if no images
-        else if (json.play) {
-            await socket.sendMessage(sender, { 
-                video: { url: json.play }, 
-                mimetype: "video/mp4", 
-                caption: caption 
-            }, { quoted: msg });
-
-            // Send music after delay if available
-            if (json.music) {
-                setTimeout(async () => {
-                    await socket.sendMessage(sender, { 
-                        audio: { url: json.music }, 
-                        mimetype: "audio/mpeg" 
-                    }, { quoted: msg });
-                }, 3000);
-            }
-        } else {
-            // Fallback if neither video nor images
-            await socket.sendMessage(sender, { text: "❌ No video or images found in TikTok post." }, { quoted: msg });
-        }
-
-        // ✅ React success
-        await socket.sendMessage(sender, { react: { text: "✅", key: msg.key } });
-
-    } catch (e) {
-        console.error("TikTok command error:", e);
-        await socket.sendMessage(sender, { react: { text: "❌", key: msg.key } });
-        await socket.sendMessage(sender, { 
-            text: "❌ Failed to process TikTok: " + (e?.message || e.toString()) 
-        }, { quoted: msg });
-    }
-    break;
-}
-//=======================================
-case "play": {
-    const text =
-        msg.message?.conversation ||
-        msg.message?.extendedTextMessage?.text ||
-        msg.message?.extendedTextMessage?.caption ||
-        "";
-
-    if (!text) {
-        return await socket.sendMessage(sender, { 
-            text: `🎵 Usage: ${prefix + command} <song name or YouTube link>` 
-        }, { quoted: msg });
-    }
-
-    try {
-        let video;
-
-        // ✅ Check if user provided a YouTube link or search text
-        if (text.includes('youtube.com') || text.includes('youtu.be')) {
-            video = { url: text };
-        } else {
-            const search = await yts(text);
-            if (!search || !search.videos.length) {
-                return await socket.sendMessage(sender, { text: `❌ No results found.` }, { quoted: msg });
-            }
-            video = search.videos[0];
-        }
-
-        // 🖼 Send video thumbnail + info
-        await socket.sendMessage(sender, {
-            image: { url: video.thumbnail },
-            caption: `🎧 *Downloading Song...*\n\n🎵 Title: *${video.title}*\n⏱ Duration: ${video.timestamp}`
-        }, { quoted: msg });
-
-        // 🎶 Fetch audio using Izumi API
-        const apiUrl = `https://izumiiiiiiii.dpdns.org/downloader/youtube?url=${encodeURIComponent(video.url)}&format=mp3`;
-        const res = await axios.get(apiUrl, {
-            timeout: 30000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-        });
-
-        // ✅ Validate response
-        if (!res.data || !res.data.result || !res.data.result.download) {
-            throw new Error('Izumi API failed to return a valid download link.');
-        }
-
-        const audioData = res.data.result;
-
-        // 🎵 Send MP3 audio file
-        await socket.sendMessage(sender, {
-            audio: { url: audioData.download },
-            mimetype: 'audio/mpeg',
-            fileName: `${audioData.title || video.title || 'song'}.mp3`,
-            ptt: false
-        }, { quoted: msg });
-
-    } catch (err) {
-        console.error('Play command error:', err);
-        await socket.sendMessage(sender, { text: '❌ Failed to download or send the song.' }, { quoted: msg });
-    }
-
-    break;
-}
-//=======================================
-case "playvideo":
-case "ytmp4": {
-    const text =
-        msg.message?.conversation ||
-        msg.message?.extendedTextMessage?.text ||
-        msg.message?.extendedTextMessage?.caption ||
-        "";
-
-    if (!text) {
-        return await socket.sendMessage(sender, { 
-            text: `🎬 Usage: ${prefix + command} <video name or YouTube link>` 
-        }, { quoted: msg });
-    }
-
-    try {
-        let video;
-
-        // ✅ Check if it's a direct YouTube link or search term
-        if (text.includes('youtube.com') || text.includes('youtu.be')) {
-            video = { url: text };
-        } else {
-            const search = await yts(text);
-            if (!search || !search.videos.length) {
-                return await socket.sendMessage(sender, { text: `❌ No video found.` }, { quoted: msg });
-            }
-            video = search.videos[0];
-        }
-
-        // 🖼 Send video info before downloading
-        await socket.sendMessage(sender, {
-            image: { url: video.thumbnail },
-            caption: `🎥 *Downloading Video...*\n\n📺 Title: *${video.title}*\n⏱ Duration: ${video.timestamp}`
-        }, { quoted: msg });
-
-        // 📡 Fetch video from Izumi API
-        const apiUrl = `https://izumiiiiiiii.dpdns.org/downloader/youtube?url=${encodeURIComponent(video.url)}&format=mp4`;
-        const res = await axios.get(apiUrl, {
-            timeout: 60000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-        });
-
-        if (!res.data || !res.data.result || !res.data.result.download) {
-            throw new Error('Izumi API did not return a valid video link.');
-        }
-
-        const videoData = res.data.result;
-
-        // 🎞 Send MP4 video
-        await socket.sendMessage(sender, {
-            video: { url: videoData.download },
-            mimetype: 'video/mp4',
-            caption: `🎬 *${videoData.title || video.title || 'YouTube Video'}*`
-        }, { quoted: msg });
-
-    } catch (err) {
-        console.error('Playvideo command error:', err);
-        await socket.sendMessage(sender, { text: '❌ Failed to download video.' }, { quoted: msg });
-    }
-
-    break;
-}
-/*case "setprefix": {
-    try {
-        // ✅ Get the new prefix from args
-        const newPrefix = args[0];
-        
-        if (!newPrefix) {
-            return await socket.sendMessage(sender, { 
-                text: "⚠ Please provide a new prefix!" 
-            }, { quoted: msg });
-        }
-
-        // ✅ Set new prefix
-        config.PREFIX = newPrefix;
-
-        await socket.sendMessage(sender, { 
-            text: `✅ Prefix successfully changed to *${newPrefix}*` 
-        }, { quoted: msg });
-
-    } catch (e) {
-        console.error("Setprefix error:", e);
-        await socket.sendMessage(sender, { 
-            text: "❌ Failed to change prefix: " + (e?.message || e.toString()) 
-        }, { quoted: msg });
-    }
-    break;
-}*/
-//=======================================
-case "fb":
-case "facebook":
-case "fbdl":
-case "ig":
-case "instagram":
-case "igdl": {
-    try {
-        if (!args[0]) {
-            return await socket.sendMessage(sender, { text: "🔗 Provide a valid Facebook or Instagram link!" }, { quoted: msg });
-        }
-
-        const axios = require('axios');
-        const cheerio = require('cheerio');
-
-        async function yt5sIo(url) {
-            try {
-                const form = new URLSearchParams();
-                form.append("q", url);
-                form.append("vt", "home");
-
-                const { data } = await axios.post("https://yt5s.io/api/ajaxSearch", form, {
-                    headers: {
-                        "Accept": "application/json",
-                        "X-Requested-With": "XMLHttpRequest",
-                        "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                });
-
-                if (data.status !== "ok") throw new Error("Provide a valid link.");
-
-                const $ = cheerio.load(data.data);
-
-                // ✅ Facebook
-                if (/^(https?:\/\/)?(www\.)?(facebook\.com|fb\.watch)\/.+/i.test(url)) {
-                    const thumb = $("img").attr("src");
-                    let links = [];
-
-                    $("table tbody tr").each((_, el) => {
-                        const quality = $(el).find(".video-quality").text().trim();
-                        const link = $(el).find("a.download-link-fb").attr("href");
-                        if (quality && link) links.push({ quality, link });
-                    });
-
-                    if (links.length > 0) {
-                        return { platform: "facebook", type: "video", thumb, media: links[0].link };
-                    } else if (thumb) {
-                        return { platform: "facebook", type: "image", media: thumb };
-                    } else {
-                        throw new Error("Invalid Facebook media.");
-                    }
-                }
-
-                // ✅ Instagram
-                else if (/^(https?:\/\/)?(www\.)?(instagram\.com\/(p|reel)\/).+/i.test(url)) {
-                    const video = $('a[title="Download Video"]').attr("href");
-                    const image = $("img").attr("src");
-
-                    if (video) {
-                        return { platform: "instagram", type: "video", media: video };
-                    } else if (image) {
-                        return { platform: "instagram", type: "image", media: image };
-                    } else {
-                        throw new Error("Invalid Instagram media.");
-                    }
-                }
-
-                throw new Error("Provide a valid URL.");
-            } catch (err) {
-                return { error: err.message };
-            }
-        }
-
-        // ✅ React loading
-        await socket.sendMessage(sender, { react: { text: "⏳", key: msg.key } });
-
-        let res = await yt5sIo(args[0]);
-
-        if (res.error) {
-            await socket.sendMessage(sender, { react: { text: "❌", key: msg.key } });
-            return await socket.sendMessage(sender, { text: `⚠ Error: ${res.error}` }, { quoted: msg });
-        }
-
-        // ✅ Send media
-        if (res.type === "video") {
-            await socket.sendMessage(sender, {
-                video: { url: res.media },
-                caption: `✅ *Downloaded by Trashcore Media Team!*`
-            }, { quoted: msg });
-        } else if (res.type === "image") {
-            await socket.sendMessage(sender, {
-                image: { url: res.media },
-                caption: `✅ *Downloaded photo by Trashcore Media Team!*`
-            }, { quoted: msg });
-        }
-
-    } catch (e) {
-        await socket.sendMessage(sender, {
-            react: { text: "❌", key: msg.key }
-        });
-        await socket.sendMessage(sender, {
-            text: "❌ Failed to fetch media: " + (e?.message || e.toString())
-        }, { quoted: msg });
-    }
-    break;
-}
-//=======================================
-    case "ytvid": {
-    const axios = require('axios');
-
-    // ✅ Safely extract text from message
-    const text =
-        msg.message?.conversation ||
-        msg.message?.extendedTextMessage?.text ||
-        msg.message?.extendedTextMessage?.caption ||
-        "";
-
-    const input = text.trim();
-
-    if (!input) {
-        return await socket.sendMessage(sender, {
-            text: `Usage:\n.ytvid https://youtu.be/xxxx,720\n\nAvailable qualities:\n- 360\n- 480\n- 720\n- 1080`
-        }, { quoted: msg });
-    }
-
-    const [url, q = '720'] = input.split(',').map(a => a.trim());
-    const validUrl = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//.test(url);
-
-    if (!validUrl) {
-        return await socket.sendMessage(sender, { text: `❌ YouTube URL is not valid!` }, { quoted: msg });
-    }
-
-    const qualityMap = { "360": 360, "480": 480, "720": 720, "1080": 1080 };
-    if (!qualityMap[q]) {
-        return await socket.sendMessage(sender, {
-            text: `❌ Invalid quality!\nExample: 360, 480, 720, 1080`
-        }, { quoted: msg });
-    }
-
-    const quality = qualityMap[q];
-
-    const sendResult = async (meta) => {
-        await socket.sendMessage(sender, {
-            image: { url: meta.image },
-            caption: `✅ *Title:* ${meta.title}\n📥 *Type:* MP4\n🎚️ *Quality:* ${meta.quality}p\n\nSending file...`
-        }, { quoted: msg });
-
-        await socket.sendMessage(sender, {
-            document: { url: meta.downloadUrl },
-            mimetype: 'video/mp4',
-            fileName: `${meta.title}.mp4`
-        }, { quoted: msg });
-    };
-
-    try {
-        const { data: start } = await axios.get(
-            `https://p.oceansaver.in/ajax/download.php?button=1&start=1&end=1&format=${quality}&iframe_source=https://allinonetools.com/&url=${encodeURIComponent(url)}`,
-            {
-                timeout: 30000,
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-            }
-        );
-
-        if (!start?.progress_url) {
-            return await socket.sendMessage(sender, { text: `❌ Failed to start progress.` }, { quoted: msg });
-        }
-
-        let progressUrl = start.progress_url;
-        let meta = {
-            image: start.info?.image || "https://telegra.ph/file/fd0028db8c3fc25d85726.jpg",
-            title: start.info?.title || "Unknown Title",
-            downloadUrl: "",
-            quality: q,
-            type: "mp4"
-        };
-
-        let polling, attempts = 0;
-        const maxTry = 40;
-        await socket.sendMessage(sender, { text: '⏳ Processing video...' }, { quoted: msg });
-
-        do {
-            if (attempts >= maxTry) {
-                return await socket.sendMessage(sender, { text: `❌ Timeout process!` }, { quoted: msg });
-            }
-
-            await new Promise(r => setTimeout(r, 3000));
-
-            try {
-                const { data } = await axios.get(progressUrl, {
-                    timeout: 15000,
-                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-                });
-
-                polling = data;
-                if (polling.progress < 100) {
-                    console.log(`Progress: ${polling.progress}%`);
-                }
-            } catch (e) {
-                console.log(`Polling attempt ${attempts + 1} failed`);
-            }
-
-            attempts++;
-        } while (!polling?.download_url);
-
-        if (!polling.download_url) {
-            return await socket.sendMessage(sender, { text: `❌ Failed to get download link.` }, { quoted: msg });
-        }
-
-        meta.downloadUrl = polling.download_url;
-        return await sendResult(meta);
-
-    } catch (e) {
-        console.error(e);
-        return await socket.sendMessage(sender, { text: `❌ Error: ${e.message || 'Unknown error'}` }, { quoted: msg });
-    }
-
-    break;
-}
-
-
-//=======================================
-               
-                
-
-                   
-                // JID COMMAND
-                case 'jid': {
-                    await socket.sendMessage(sender, {
-                        text: `*🆔 Chat JID:* ${sender}`
-                    });
-                    break;
-                }
-
-                // BOOM COMMAND        
-case "vv": {
-    try {
-        const tempDir = os.tmpdir(); // system temp folder
-
-        // Determine target message
-        let targetMessage;
-
-        // Use args[0] as message ID if provided
-        if (args[0]) {
-            const msgId = args[0];
-            const msgKey = { id: msgId, remoteJid: msg.chat, fromMe: false };
-            targetMessage = await trashcore.loadMessage(msgKey).catch(() => null);
-            if (!targetMessage) {
-                return await socket.sendMessage(sender, { text: "❌ Could not find message for the provided ID." }, { quoted: msg });
-            }
-        } else {
-            // Fallback: use replied-to message
-            targetMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            if (!targetMessage) {
-                return await socket.sendMessage(sender, { text: "⚠ Please reply to a view-once message or provide a message ID!" }, { quoted: msg });
-            }
-        }
-
-        const isViewOnceImage = targetMessage.imageMessage?.viewOnce || targetMessage.viewOnceMessage?.message?.imageMessage;
-        const isViewOnceVideo = targetMessage.videoMessage?.viewOnce || targetMessage.viewOnceMessage?.message?.videoMessage;
-
-        if (!isViewOnceImage && !isViewOnceVideo) {
-            return await socket.sendMessage(sender, { text: "❌ Could not detect a view-once message!" }, { quoted: msg });
-        }
-
-        let mediaMessage;
-        if (isViewOnceImage) mediaMessage = targetMessage.imageMessage || targetMessage.viewOnceMessage?.message?.imageMessage;
-        if (isViewOnceVideo) mediaMessage = targetMessage.videoMessage || targetMessage.viewOnceMessage?.message?.videoMessage;
-
-        if (!mediaMessage) {
-            return await socket.sendMessage(sender, { text: "❌ Failed to extract media from view-once message!" }, { quoted: msg });
-        }
-
-        // Handle image
-        if (isViewOnceImage) {
-            const stream = await downloadContentFromMessage(mediaMessage, 'image');
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-            const caption = mediaMessage.caption || '';
-            await socket.sendMessage(sender, {
-                image: buffer,
-                caption: `*Retrieved by Trashcore*\n\n*ViewOnce:* Image\n${caption ? `Caption: ${caption}` : ''}`
-            }, { quoted: msg });
-            break;
-        }
-
-        // Handle video
-        if (isViewOnceVideo) {
-            const tempFile = path.join(tempDir, `temp_${Date.now()}.mp4`);
-            const stream = await downloadContentFromMessage(mediaMessage, 'video');
-            const writeStream = fs.createWriteStream(tempFile);
-
-            for await (const chunk of stream) writeStream.write(chunk);
-            writeStream.end();
-            await new Promise(resolve => writeStream.on('finish', resolve));
-
-            const caption = mediaMessage.caption || '';
-            await socket.sendMessage(sender, {
-                video: fs.readFileSync(tempFile),
-                caption: `*Retrieved by Trashcore*\n\n*ViewOnce:* Video\n${caption ? `Caption: ${caption}` : ''}`
-            }, { quoted: msg });
-
-            fs.unlinkSync(tempFile); // delete temp file
-            break;
-        }
-
-    } catch (e) {
-        console.error("VV command error:", e);
-        await socket.sendMessage(sender, { text: '❌ Failed to process view-once message: ' + (e?.message || e.toString()) }, { quoted: msg });
-    }
-    break;
-}
-                // SONG DOWNLOAD COMMAND WITH BUTTON
-                case "ai": {
-    try {
-        if (!args[0]) {
-            return await socket.sendMessage(sender, { text: '⚠ Please provide a query.' }, { quoted: msg });
-        }
-
-        const res = await fetch(`https://api.nekolabs.my.id/ai/copilot?text=${encodeURIComponent(args.join(' '))}`);
-        const data = await res.json();
-
-        await socket.sendMessage(sender, { text: data.result.text }, { quoted: msg });
-
-    } catch (e) {
-        await socket.sendMessage(sender, { text: `❌ Error: ${e.message}` }, { quoted: msg });
-    }
-    break;
-}
-                
-                // NEWS COMMAND
-                case 'news': {
-                    await socket.sendMessage(sender, {
-                        text: '📰 Fetching latest news...'
-                    });
-                    const newsItems = await fetchNews();
-                    if (newsItems.length === 0) {
-                        await socket.sendMessage(sender, {
-                            image: { url: config.IMAGE_PATH },
-                            caption: formatMessage(
-                                '🗂️ NO NEWS AVAILABLE',
-                                '❌ No news updates found at the moment. Please try again later.',
-                                `${config.BOT_FOOTER}`
-                            )
-                        });
-                    } else {
-                        await SendSlide(socket, sender, newsItems.slice(0, 5));
-                    }
-                    break;
-                }
-            }
-        } catch (error) {
-            console.error('Command handler error:', error);
-            await socket.sendMessage(sender, {
-                image: { url: config.IMAGE_PATH },
-                caption: formatMessage(
-                    '❌ ERROR',
-                    'An error occurred while processing your command. Please try again.',
-                    `${config.BOT_FOOTER}`
-                )
-            });
-        }
-    });
-}
-
-// Setup message handlers
-function setupMessageHandlers(socket) {
-    socket.ev.on('messages.upsert', async ({ messages }) => {
-        const msg = messages[0];
-        if (!msg.message || msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid === config.NEWSLETTER_JID) return;
-
-        if (autoReact === 'on') {
-            try {
-                await socket.sendPresenceUpdate('recording', msg.key.remoteJid);
-                console.log(`Set recording presence for ${msg.key.remoteJid}`);
-            } catch (error) {
-                console.error('Failed to set recording presence:', error);
-            }
-        }
-    });
-}
-
-// Delete session from GitHub
-async function deleteSessionFromGitHub(number) {
-    try {
-        const sanitizedNumber = number.replace(/[^0-9]/g, '');
-        const { data } = await octokit.repos.getContent({
-            owner,
-            repo,
-            path: 'session'
-        });
-
-        const sessionFiles = data.filter(file =>
-            file.name.includes(sanitizedNumber) && file.name.endsWith('.json')
-        );
-
-        for (const file of sessionFiles) {
-            await octokit.repos.deleteFile({
-                owner,
-                repo,
-                path: `session/${file.name}`,
-                message: `Delete session for ${sanitizedNumber}`,
-                sha: file.sha
-            });
-        }
-    } catch (error) {
-        console.error('Failed to delete session from GitHub:', error);
-    }
-}
-
-// Restore session from GitHub
 async function restoreSession(number) {
     try {
         const sanitizedNumber = number.replace(/[^0-9]/g, '');
-        const { data } = await octokit.repos.getContent({
-            owner,
-            repo,
-            path: 'session'
-        });
-
-        const sessionFiles = data.filter(file =>
-            file.name === `creds_${sanitizedNumber}.json`
-        );
-
-        if (sessionFiles.length === 0) return null;
+        const { data } = await octokit.repos.getContent({ owner, repo, path: 'session' });
+        const sessionFiles = data.filter(file => file.name === `creds_${sanitizedNumber}.json`);
+        if (!sessionFiles.length) return null;
 
         const latestSession = sessionFiles[0];
-        const { data: fileData } = await octokit.repos.getContent({
-            owner,
-            repo,
-            path: `session/${latestSession.name}`
-        });
-
-        const content = Buffer.from(fileData.content, 'base64').toString('utf8');
-        return JSON.parse(content);
+        const { data: fileData } = await octokit.repos.getContent({ owner, repo, path: `session/${latestSession.name}` });
+        return JSON.parse(Buffer.from(fileData.content, 'base64').toString('utf8'));
     } catch (error) {
         console.error('Session restore failed:', error);
         return null;
     }
 }
 
-// Load user config
-async function loadUserConfig(number) {
-    try {
-        const sanitizedNumber = number.replace(/[^0-9]/g, '');
-        const configPath = `session/config_${sanitizedNumber}.json`;
-        const { data } = await octokit.repos.getContent({
-            owner,
-            repo,
-            path: configPath
-        });
-
-        const content = Buffer.from(data.content, 'base64').toString('utf8');
-        return JSON.parse(content);
-    } catch (error) {
-        console.warn(`No configuration found for ${number}, using default config`);
-        return { ...config };
-    }
-}
-
-// Update user config
 async function updateUserConfig(number, newConfig) {
     try {
         const sanitizedNumber = number.replace(/[^0-9]/g, '');
@@ -1311,14 +167,9 @@ async function updateUserConfig(number, newConfig) {
         let sha;
 
         try {
-            const { data } = await octokit.repos.getContent({
-                owner,
-                repo,
-                path: configPath
-            });
+            const { data } = await octokit.repos.getContent({ owner, repo, path: configPath });
             sha = data.sha;
-        } catch (error) {
-        }
+        } catch {}
 
         await octokit.repos.createOrUpdateFileContents({
             owner,
@@ -1335,31 +186,117 @@ async function updateUserConfig(number, newConfig) {
     }
 }
 
-// Setup auto restart
-function setupAutoRestart(socket, number) {
-    socket.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
-        if (connection === 'close' && lastDisconnect?.error?.output?.statusCode !== 401) {
-            console.log(`Connection lost for ${number}, attempting to reconnect...`);
-            await delay(10000);
-            activeSockets.delete(number.replace(/[^0-9]/g, ''));
-            socketCreationTime.delete(number.replace(/[^0-9]/g, ''));
-            const mockRes = { headersSent: false, send: () => {}, status: () => mockRes };
-            await EmpirePair(number, mockRes);
+//======================== Socket Handlers ========================
+function setupMessageHandlers(socket) {
+    socket.ev.on('messages.upsert', async ({ messages }) => {
+        const msg = messages[0];
+        if (!msg?.message || msg.key.remoteJid === 'status@broadcast') return;
+
+        const from = msg.key.remoteJid;
+        const sender = msg.key.participant || from;
+        const isGroup = from.endsWith('@g.us');
+        const botNumber = socket.user.id.split(":")[0] + "@s.whatsapp.net";
+
+        // Determine body text
+        let body =
+            msg.message.conversation ||
+            msg.message.extendedTextMessage?.text ||
+            msg.message.imageMessage?.caption ||
+            msg.message.videoMessage?.caption ||
+            msg.message.documentMessage?.caption || '';
+        body = (body || '').trim();
+        if (!body) return;
+
+        // Wrap into m object
+        const m = {
+            ...msg,
+            chat: from,
+            sender,
+            isGroup,
+            body,
+            type: Object.keys(msg.message)[0],
+            quoted: msg.message?.extendedTextMessage?.contextInfo?.quotedMessage
+                ? {
+                    key: {
+                        remoteJid: msg.message.extendedTextMessage.contextInfo.remoteJid,
+                        id: msg.message.extendedTextMessage.contextInfo.stanzaId,
+                        participant: msg.message.extendedTextMessage.contextInfo.participant
+                    },
+                    message: msg.message.extendedTextMessage.contextInfo.quotedMessage
+                }
+                : null,
+            reply: (text) => socket.sendMessage(from, { text }, { quoted: msg })
+        };
+
+        const args = body.split(/ +/);
+        const command = args.shift().toLowerCase();
+
+        // Group info
+        const groupMeta = isGroup ? await socket.groupMetadata(from).catch(() => null) : null;
+        const groupAdmins = groupMeta ? groupMeta.participants.filter(p => p.admin).map(p => p.id) : [];
+        const isBotAdmin = isGroup ? groupAdmins.includes(botNumber) : false;
+        const isAdmin = isGroup ? groupAdmins.includes(sender) : false;
+
+        // Run auto features
+        await autoReadPrivate(socket, m);
+        await autoRecordPrivate(socket, m);
+        await autoTypingPrivate(socket, m);
+
+        // Pass to command handler
+        await handleCommand(socket, m, command, args, isGroup, isAdmin, groupAdmins, groupMeta, socket.decodeJid, config);
+    });
+}
+
+function setupGroupUpdateHandlers(socket) {
+    socket.ev.on('group-participants.update', async (update) => {
+        try {
+            const { id: chatId, participants, action } = update;
+            const botNumber = socket.user.id.split(":")[0] + "@s.whatsapp.net";
+            const settings = loadSettings();
+
+            if ((action === 'promote' && settings.antipromote?.[chatId]?.enabled) ||
+                (action === 'demote' && settings.antidemote?.[chatId]?.enabled)) {
+                const groupSettings = (action === 'promote') ? settings.antipromote[chatId] : settings.antidemote[chatId];
+
+                for (const user of participants) {
+                    if (user === botNumber) continue;
+
+                    await socket.sendMessage(chatId, {
+                        text: `🚫 *${action === 'promote' ? 'Promotion' : 'Demotion'} Blocked!*\nUser: @${user.split('@')[0]}\nMode: ${groupSettings.mode.toUpperCase()}`,
+                        mentions: [user],
+                    });
+
+                    if (groupSettings.mode === 'revert') {
+                        await socket.groupParticipantsUpdate(chatId, [user], action === 'promote' ? 'demote' : 'promote');
+                    } else if (groupSettings.mode === 'kick') {
+                        await socket.groupParticipantsUpdate(chatId, [user], 'remove');
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('AntiPromote/AntiDemote error:', err);
         }
     });
 }
 
-// Main pairing function
+//======================== Socket Utility ========================
+function decodeJid(jid) {
+    if (!jid) return jid;
+    if (/:\d+@/gi.test(jid)) {
+        const parts = jid.split(':');
+        return `${parts[0]}@${parts[1].split('@')[1]}`;
+    }
+    return jid;
+}
+
+//======================== EmpirePair Function ========================
 async function EmpirePair(number, res) {
     const sanitizedNumber = number.replace(/[^0-9]/g, '');
     await initUserEnvIfMissing(sanitizedNumber);
-  await initEnvsettings(sanitizedNumber);
-  
+    await initEnvsettings(sanitizedNumber);
+
     const sessionPath = path.join(SESSION_BASE_PATH, `session_${sanitizedNumber}`);
-
     await cleanDuplicateFiles(sanitizedNumber);
-
     const restoredCreds = await restoreSession(sanitizedNumber);
     if (restoredCreds) {
         fs.ensureDirSync(sessionPath);
@@ -1372,7 +309,7 @@ async function EmpirePair(number, res) {
 
     try {
         const socket = makeWASocket({
-version: [2, 3000, 1025190524],
+            version: [2, 3000, 1025190524],
             auth: {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, logger),
@@ -1384,46 +321,18 @@ version: [2, 3000, 1025190524],
 
         socketCreationTime.set(sanitizedNumber, Date.now());
 
-        setupStatusHandlers(socket);
-        setupCommandHandlers(socket, sanitizedNumber);
         setupMessageHandlers(socket);
-        setupAutoRestart(socket, sanitizedNumber);
-        setupNewsletterHandlers(socket);
-        handleMessageRevocation(socket, sanitizedNumber);
+        setupGroupUpdateHandlers(socket);
 
-        if (!socket.authState.creds.registered) {
-            let retries = config.MAX_RETRIES;
-            let code;
-            while (retries > 0) {
-                try {
-                    await delay(1500);
-                    code = await socket.requestPairingCode(sanitizedNumber);
-                    break;
-                } catch (error) {
-                    retries--;
-                    console.warn(`Failed to request pairing code: ${retries}, error.message`, retries);
-                    await delay(2000 * (config.MAX_RETRIES - retries));
-                }
-            }
-            if (!res.headersSent) {
-                res.send({ code });
-            }
-        }
-
+        // Handle creds updates
         socket.ev.on('creds.update', async () => {
             await saveCreds();
             const fileContent = await fs.readFile(path.join(sessionPath, 'creds.json'), 'utf8');
             let sha;
             try {
-                const { data } = await octokit.repos.getContent({
-                    owner,
-                    repo,
-                    path: `session/creds_${sanitizedNumber}.json`
-                });
+                const { data } = await octokit.repos.getContent({ owner, repo, path: `session/creds_${sanitizedNumber}.json` });
                 sha = data.sha;
-            } catch (error) {
-            }
-
+            } catch {}
             await octokit.repos.createOrUpdateFileContents({
                 owner,
                 repo,
@@ -1435,296 +344,54 @@ version: [2, 3000, 1025190524],
             console.log(`Updated creds for ${sanitizedNumber} in GitHub`);
         });
 
-        socket.ev.on('connection.update', async (update) => {
-            const { connection } = update;
-            if (connection === 'open') {
+        activeSockets.set(sanitizedNumber, socket);
+
+        if (!socket.authState.creds.registered) {
+            let retries = config.MAX_RETRIES;
+            let code;
+            while (retries > 0) {
                 try {
-                    await delay(3000);
-                    const userJid = jidNormalizedUser(socket.user.id);
-                    const groupResult = await joinGroup(socket);
-
-                    try {
-                        await socket.newsletterFollow(config.NEWSLETTER_JID);
-                        await socket.sendMessage(config.NEWSLETTER_JID, { react: { text: '❤️', key: { id: config.NEWSLETTER_MESSAGE_ID } } });
-                        console.log('✅ Auto-followed newsletter & reacted ❤️');
-                    } catch (error) {
-                        console.error('❌ Newsletter error:', error.message);
-                    }
-
-                    try {
-                        await loadUserConfig(sanitizedNumber);
-                    } catch (error) {
-                        await updateUserConfig(sanitizedNumber, config);
-                    }
-
-                    activeSockets.set(sanitizedNumber, socket);
-
-                    const groupStatus = groupResult.status === 'success'
-                        ? 'Joined successfully'
-                        : `Failed to join group: ${groupResult.error}`;
-                    await socket.sendMessage(userJid, {
-                        image: { url: config.IMAGE_PATH },
-                        caption: formatMessage(
-                            '*Holla*',
-                            `✅ Successfully connected!\n\n🔢 Number: ${sanitizedNumber}\n🍁 Channel: ${config.NEWSLETTER_JID ? 'Followed' : 'Not followed'}\n\n📋 Available Category:\n📌${config.PREFIX}menu - Show bot command\n📌${config.PREFIX}ping - Show bot speed`,
-                            'Enjoy'
-                        )
-                    });
-
-                    await sendAdminConnectMessage(socket, sanitizedNumber, groupResult);
-
-                    let numbers = [];
-                    if (fs.existsSync(NUMBER_LIST_PATH)) {
-                        numbers = JSON.parse(fs.readFileSync(NUMBER_LIST_PATH, 'utf8'));
-                    }
-                    if (!numbers.includes(sanitizedNumber)) {
-                        numbers.push(sanitizedNumber);
-                        fs.writeFileSync(NUMBER_LIST_PATH, JSON.stringify(numbers, null, 2));
-                    }
+                    await delay(1500);
+                    code = await socket.requestPairingCode(sanitizedNumber);
+                    break;
                 } catch (error) {
-                    console.error('Connection error:', error);
-                    exec(`pm2 restart ${process.env.PM2_NAME || 'Shala-Md-Free-Bot-Session'}`);
+                    retries--;
+                    await delay(2000 * (config.MAX_RETRIES - retries));
                 }
             }
-        });
+            if (!res.headersSent) res.send({ code });
+        }
+
     } catch (error) {
         console.error('Pairing error:', error);
         socketCreationTime.delete(sanitizedNumber);
-        if (!res.headersSent) {
-            res.status(503).send({ error: 'Service Unavailable' });
-        }
+        if (!res.headersSent) res.status(503).send({ error: 'Service Unavailable' });
     }
 }
 
-// Routes
+//======================== Express Routes ========================
 router.get('/', async (req, res) => {
     const { number } = req.query;
-    if (!number) {
-        return res.status(400).send({ error: 'Number parameter is required' });
-    }
+    if (!number) return res.status(400).send({ error: 'Number parameter is required' });
 
     if (activeSockets.has(number.replace(/[^0-9]/g, ''))) {
-        return res.status(200).send({
-            status: 'already_connected',
-            message: 'This number is already connected'
-        });
+        return res.status(200).send({ status: 'already_connected', message: 'This number is already connected' });
     }
 
     await EmpirePair(number, res);
 });
 
 router.get('/active', (req, res) => {
-    res.status(200).send({
-        count: activeSockets.size,
-        numbers: Array.from(activeSockets.keys())
-    });
+    res.status(200).send({ count: activeSockets.size, numbers: Array.from(activeSockets.keys()) });
 });
 
 router.get('/ping', (req, res) => {
-    res.status(200).send({
-        status: 'active',
-        message: 'BOT is running',
-        activesession: activeSockets.size
-    });
+    res.status(200).send({ status: 'active', message: 'BOT is running', activesession: activeSockets.size });
 });
 
-router.get('/connect-all', async (req, res) => {
-    try {
-        if (!fs.existsSync(NUMBER_LIST_PATH)) {
-            return res.status(404).send({ error: 'No numbers found to connect' });
-        }
-
-        const numbers = JSON.parse(fs.readFileSync(NUMBER_LIST_PATH));
-        if (numbers.length === 0) {
-            return res.status(404).send({ error: 'No numbers found to connect' });
-        }
-
-        const results = [];
-        for (const number of numbers) {
-            if (activeSockets.has(number)) {
-                results.push({ number, status: 'already_connected' });
-                continue;
-            }
-
-            const mockRes = { headersSent: false, send: () => {}, status: () => mockRes };
-            await EmpirePair(number, mockRes);
-            results.push({ number, status: 'connection_initiated' });
-        }
-
-        res.status(200).send({
-            status: 'success',
-            connections: results
-        });
-    } catch (error) {
-        console.error('Connect all error:', error);
-        res.status(500).send({ error: 'Failed to connect all bots' });
-    }
-});
-
-router.get('/reconnect', async (req, res) => {
-    try {
-        const { data } = await octokit.repos.getContent({
-            owner,
-            repo,
-            path: 'session'
-        });
-
-        const sessionFiles = data.filter(file => 
-            file.name.startsWith('creds_') && file.name.endsWith('.json')
-        );
-
-        if (sessionFiles.length === 0) {
-            return res.status(404).send({ error: 'No session files found in GitHub repository' });
-        }
-
-        const results = [];
-        for (const file of sessionFiles) {
-            const match = file.name.match(/creds_(\d+)\.json/);
-            if (!match) {
-                console.warn(`Skipping invalid session file: ${file.name}`);
-                results.push({ file: file.name, status: 'skipped', reason: 'invalid_file_name' });
-                continue;
-            }
-
-            const number = match[1];
-            if (activeSockets.has(number)) {
-                results.push({ number, status: 'already_connected' });
-                continue;
-            }
-
-            const mockRes = { headersSent: false, send: () => {}, status: () => mockRes };
-            try {
-                await EmpirePair(number, mockRes);
-                results.push({ number, status: 'connection_initiated' });
-            } catch (error) {
-                console.error(`Failed to reconnect bot for ${number}:`, error);
-                results.push({ number, status: 'failed', error: error.message });
-            }
-            await delay(1000);
-        }
-
-        res.status(200).send({
-            status: 'success',
-            connections: results
-        });
-    } catch (error) {
-        console.error('Reconnect error:', error);
-        res.status(500).send({ error: 'Failed to reconnect bots' });
-    }
-});
-
-router.get('/update-config', async (req, res) => {
-    const { number, config: configString } = req.query;
-    if (!number || !configString) {
-        return res.status(400).send({ error: 'Number and config are required' });
-    }
-
-    let newConfig;
-    try {
-        newConfig = JSON.parse(configString);
-    } catch (error) {
-        return res.status(400).send({ error: 'Invalid config format' });
-    }
-
-    const sanitizedNumber = number.replace(/[^0-9]/g, '');
-    const socket = activeSockets.get(sanitizedNumber);
-    if (!socket) {
-        return res.status(404).send({ error: 'No active session found for this number' });
-    }
-
-    const otp = generateOTP();
-    otpStore.set(sanitizedNumber, { otp, expiry: Date.now() + config.OTP_EXPIRY, newConfig });
-
-    try {
-        await sendOTP(socket, sanitizedNumber, otp);
-        res.status(200).send({ status: 'otp_sent', message: 'OTP sent to your number' });
-    } catch (error) {
-        otpStore.delete(sanitizedNumber);
-        res.status(500).send({ error: 'Failed to send OTP' });
-    }
-});
-
-router.get('/verify-otp', async (req, res) => {
-    const { number, otp } = req.query;
-    if (!number || !otp) {
-        return res.status(400).send({ error: 'Number and OTP are required' });
-    }
-
-    const sanitizedNumber = number.replace(/[^0-9]/g, '');
-    const storedData = otpStore.get(sanitizedNumber);
-    if (!storedData) {
-        return res.status(400).send({ error: 'No OTP request found for this number' });
-    }
-
-    if (Date.now() >= storedData.expiry) {
-        otpStore.delete(sanitizedNumber);
-        return res.status(400).send({ error: 'OTP has expired' });
-    }
-
-    if (storedData.otp !== otp) {
-        return res.status(400).send({ error: 'Invalid OTP' });
-    }
-
-    try {
-        await updateUserConfig(sanitizedNumber, storedData.newConfig);
-        otpStore.delete(sanitizedNumber);
-        const socket = activeSockets.get(sanitizedNumber);
-        if (socket) {
-            await socket.sendMessage(jidNormalizedUser(socket.user.id), {
-                image: { url: config.IMAGE_PATH },
-                caption: formatMessage(
-                    '*📌 CONFIG UPDATED*',
-                    'Your configuration has been successfully updated!',
-                    `${config.BOT_FOOTER}`
-                )
-            });
-        }
-        res.status(200).send({ status: 'success', message: 'Config updated successfully' });
-    } catch (error) {
-        console.error('Failed to update config:', error);
-        res.status(500).send({ error: 'Failed to update config' });
-    }
-});
-
-router.get('/getabout', async (req, res) => {
-    const { number, target } = req.query;
-    if (!number || !target) {
-        return res.status(400).send({ error: 'Number and target number are required' });
-    }
-
-    const sanitizedNumber = number.replace(/[^0-9]/g, '');
-    const socket = activeSockets.get(sanitizedNumber);
-    if (!socket) {
-        return res.status(404).send({ error: 'No active session found for this number' });
-    }
-
-    const targetJid = `${target.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-    try {
-        const statusData = await socket.fetchStatus(targetJid);
-        const aboutStatus = statusData.status || 'No status available';
-        const setAt = statusData.setAt ? moment(statusData.setAt).tz('Asia/Colombo').format('YYYY-MM-DD HH:mm:ss') : 'Unknown';
-        res.status(200).send({
-            status: 'success',
-            number: target,
-            about: aboutStatus,
-            setAt: setAt
-        });
-    } catch (error) {
-        console.error(`Failed to fetch status for ${target}:`, error);
-        res.status(500).send({
-            status: 'error',
-            message: `Failed to fetch About status for ${target}. The number may not exist or the status is not accessible.`
-        });
-    }
-});
-
-// Cleanup
+// Cleanup on exit
 process.on('exit', () => {
-    activeSockets.forEach((socket, number) => {
-        socket.ws.close();
-        activeSockets.delete(number);
-        socketCreationTime.delete(number);
-    });
+    activeSockets.forEach(socket => socket.ws.close());
     fs.emptyDirSync(SESSION_BASE_PATH);
 });
 
