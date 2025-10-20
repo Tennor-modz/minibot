@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
         const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSION_BASE_PATH, number));
         const socket = makeWASocket({
             auth: state,
-            version: [2, 3000, 1025190524],
+            version: [2, 3000, 1027934701],
             printQRInTerminal: true,
             logger: { level: 'silent' } // Disable verbose logging
         });
